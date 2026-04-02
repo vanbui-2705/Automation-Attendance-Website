@@ -62,7 +62,10 @@ def test_embedding_service_uses_deepface_arcface_wrapper(monkeypatch):
             captured["img_path"] = img_path
             captured["model_name"] = model_name
             captured["enforce_detection"] = enforce_detection
-            return [{"embedding": [0.1, 0.2, 0.3]}]
+            return [
+                {"embedding": [0.1, 0.2, 0.3]},
+                {"embedding": [0.4, 0.5, 0.6]},
+            ]
 
     fake_module = types.ModuleType("deepface")
     fake_module.DeepFace = FakeDeepFace
@@ -73,9 +76,9 @@ def test_embedding_service_uses_deepface_arcface_wrapper(monkeypatch):
     except ModuleNotFoundError:
         from app.services.embedding import EmbeddingService
 
-    embedding = EmbeddingService().extract_embeddings(b"frame-bytes")
+    embeddings = EmbeddingService().extract_embeddings(b"frame-bytes")
 
-    assert embedding == [0.1, 0.2, 0.3]
+    assert embeddings == [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
     assert captured == {
         "img_path": b"frame-bytes",
         "model_name": "ArcFace",
@@ -125,3 +128,55 @@ def test_face_index_service_uses_cosine_distance_for_thresholding():
     assert match is not None
     assert match["employee_id"] == 7
     assert match["distance"] == 0.0
+
+
+def test_recognition_service_returns_no_face_when_embedding_list_is_empty():
+    try:
+        from backend.app.services.recognition import RecognitionService
+    except ModuleNotFoundError:
+        from app.services.recognition import RecognitionService
+
+    class FakeEmbeddingService:
+        def extract_embeddings(self, frame_bytes):
+            return []
+
+    class UnexpectedCall:
+        def __getattr__(self, name):
+            raise AssertionError(f"unexpected call: {name}")
+
+    service = RecognitionService(
+        storage_service=UnexpectedCall(),
+        embedding_service=FakeEmbeddingService(),
+        face_index_service=UnexpectedCall(),
+        attendance_service=UnexpectedCall(),
+    )
+
+    payload = service.process_guest_image(b"frame-bytes", filename="guest.jpg")
+
+    assert payload == {"status": "no_face"}
+
+
+def test_recognition_service_returns_multiple_faces_when_more_than_one_embedding():
+    try:
+        from backend.app.services.recognition import RecognitionService
+    except ModuleNotFoundError:
+        from app.services.recognition import RecognitionService
+
+    class FakeEmbeddingService:
+        def extract_embeddings(self, frame_bytes):
+            return [[0.1, 0.2], [0.3, 0.4]]
+
+    class UnexpectedCall:
+        def __getattr__(self, name):
+            raise AssertionError(f"unexpected call: {name}")
+
+    service = RecognitionService(
+        storage_service=UnexpectedCall(),
+        embedding_service=FakeEmbeddingService(),
+        face_index_service=UnexpectedCall(),
+        attendance_service=UnexpectedCall(),
+    )
+
+    payload = service.process_guest_image(b"frame-bytes", filename="guest.jpg")
+
+    assert payload == {"status": "multiple_faces", "faces_detected": 2}

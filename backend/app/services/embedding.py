@@ -10,4 +10,4 @@ class EmbeddingService:
         if not results:
             return []
 
-        return list(results[0]["embedding"])
+        return [list(result["embedding"]) for result in results]
