@@ -68,7 +68,7 @@ describe("Manager login", () => {
     await user.type(screen.getByLabelText(/password/i), "wrong");
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/incorrect username or password/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/ten dang nhap hoac mat khau khong dung/i);
   });
 
   it("does not show an auth error on the first visit to the login page", async () => {

@@ -93,7 +93,7 @@ describe("Employee face management", () => {
     ]);
     await user.click(screen.getByRole("button", { name: /enroll faces/i }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/did not contain a detectable face/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/khong phat hien khuon mat/i);
   });
 
   it("submits enrollment and refreshes samples", async () => {

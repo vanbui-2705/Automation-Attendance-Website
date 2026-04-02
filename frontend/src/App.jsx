@@ -5,7 +5,7 @@ import { ManagerLayout } from "./components/ManagerLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { EmployeeFacesPage } from "./pages/EmployeeFacesPage";
 import { EmployeeListPage } from "./pages/EmployeeListPage";
-import { GuestPlaceholderPage } from "./pages/GuestPlaceholderPage";
+import GuestPlaceholderPage from "./pages/GuestPlaceholderPage";
 import { LandingPage } from "./pages/LandingPage";
 import { ManagerLoginPage } from "./pages/ManagerLoginPage";
 

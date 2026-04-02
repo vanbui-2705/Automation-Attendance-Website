@@ -1,91 +1,131 @@
-async function parseResponse(response) {
-  const text = await response.text();
-  let payload = null;
+export class ApiError extends Error {
+  constructor(message, { payload = null, status = 0 } = {}) {
+    super(message)
+    this.name = 'ApiError'
+    this.payload = payload
+    this.status = status
+  }
+}
 
-  if (text) {
-    try {
-      payload = JSON.parse(text);
-    } catch {
-      payload = { rawBody: text };
-    }
+async function parseResponseBody(response) {
+  const text = await response.text()
+
+  if (!text) {
+    return null
   }
 
-  if (!response.ok) {
-    const message =
-      (payload && typeof payload === "object" && payload.message) ||
-      (payload && typeof payload === "object" && payload.rawBody) ||
-      `Request failed with status ${response.status}`;
-    const error = new Error(message);
-    error.status = response.status;
-    error.payload = payload;
-    throw error;
+  try {
+    return JSON.parse(text)
+  } catch {
+    return text
   }
-
-  return payload;
 }
 
 export async function apiRequest(path, options = {}) {
-  const response = await fetch(path, {
-    credentials: "include",
-    ...options,
-    headers: {
-      ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-      ...(options.headers || {}),
-    },
-    body:
-      options.body instanceof FormData || typeof options.body === "string"
-        ? options.body
-        : options.body
-          ? JSON.stringify(options.body)
-          : undefined,
-  });
+  const {
+    body,
+    credentials = 'include',
+    headers = {},
+    method = 'GET',
+  } = options
 
-  return parseResponse(response);
+  const requestHeaders = { ...headers }
+  const requestInit = { credentials, headers: requestHeaders, method }
+
+  if (body instanceof FormData) {
+    requestInit.body = body
+  } else if (body !== undefined) {
+    requestHeaders['Content-Type'] = 'application/json'
+    requestInit.body = JSON.stringify(body)
+  }
+
+  const response = await fetch(path, requestInit)
+  const payload = await parseResponseBody(response)
+
+  if (!response.ok) {
+    const message =
+      (payload && typeof payload === 'object' && payload.message) ||
+      (typeof payload === 'string' ? payload : response.statusText) ||
+      'Request failed'
+    throw new ApiError(message, { payload, status: response.status })
+  }
+
+  return payload
 }
 
-export function loginManager(username, password) {
-  return apiRequest("/api/manager/login", {
-    method: "POST",
-    body: { username, password },
-  });
+export function loginManager(usernameOrCredentials, password) {
+  const credentials =
+    typeof usernameOrCredentials === 'object' && usernameOrCredentials !== null
+      ? usernameOrCredentials
+      : {
+          password,
+          username: usernameOrCredentials,
+        }
+
+  return apiRequest('/api/manager/login', {
+    body: credentials,
+    method: 'POST',
+  })
 }
 
-export function getCurrentManager() {
-  return apiRequest("/api/manager/me");
+export function fetchManagerMe() {
+  return apiRequest('/api/manager/me')
 }
 
-export function getEmployees() {
-  return apiRequest("/api/manager/employees");
+export const getCurrentManager = fetchManagerMe
+export const getManager = fetchManagerMe
+
+export function fetchEmployees() {
+  return apiRequest('/api/manager/employees')
 }
 
-export function createEmployee(employeeCode, fullName) {
-  return apiRequest("/api/manager/employees", {
-    method: "POST",
-    body: {
-      employee_code: employeeCode,
-      full_name: fullName,
-    },
-  });
+export const getEmployees = fetchEmployees
+
+export function createEmployee(employeeOrCode, fullName) {
+  const employee =
+    typeof employeeOrCode === 'object' && employeeOrCode !== null
+      ? employeeOrCode
+      : {
+          employee_code: employeeOrCode,
+          full_name: fullName,
+        }
+
+  return apiRequest('/api/manager/employees', {
+    body: employee,
+    method: 'POST',
+  })
 }
 
-export function getFaceSamples(employeeId) {
-  return apiRequest(`/api/manager/employees/${employeeId}/face-samples`);
+export function fetchEmployeeFaceSamples(employeeId) {
+  return apiRequest(`/api/manager/employees/${employeeId}/face-samples`)
 }
 
-export function enrollFaceSamples(employeeId, files) {
-  const formData = new FormData();
-  files.forEach((file) => {
-    formData.append("images", file);
-  });
+export const getFaceSamples = fetchEmployeeFaceSamples
+
+export function enrollEmployeeFaces(employeeId, formDataOrFiles) {
+  const formData =
+    formDataOrFiles instanceof FormData
+      ? formDataOrFiles
+      : (() => {
+          const converted = new FormData()
+          Array.from(formDataOrFiles || []).forEach((file) => {
+            converted.append('images', file, file?.name || 'face.jpg')
+          })
+          return converted
+        })()
 
   return apiRequest(`/api/manager/employees/${employeeId}/face-enrollment`, {
-    method: "POST",
     body: formData,
-  });
+    method: 'POST',
+  })
 }
 
-export function deleteFaceSamples(employeeId) {
+export const enrollFaceSamples = enrollEmployeeFaces
+
+export function deleteEmployeeFaceSamples(employeeId) {
   return apiRequest(`/api/manager/employees/${employeeId}/face-samples`, {
-    method: "DELETE",
-  });
+    method: 'DELETE',
+  })
 }
+
+export const deleteFaceSamples = deleteEmployeeFaceSamples
