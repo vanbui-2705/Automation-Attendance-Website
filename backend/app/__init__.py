@@ -38,7 +38,7 @@ def _initialize_database(app):
 
 
 def _initialize_services(app):
-    storage_service = StorageService(app.config["CHECKIN_DIR"])
+    storage_service = StorageService(app.config["CHECKIN_DIR"], app.config["FACES_DIR"])
     embedding_service = EmbeddingService()
     face_index_service = FaceIndexService()
     attendance_service = AttendanceService()

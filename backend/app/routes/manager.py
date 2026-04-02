@@ -1,8 +1,10 @@
+import json
+
+from flask import Blueprint, current_app, jsonify, request
 from sqlalchemy.exc import IntegrityError
-from flask import Blueprint, jsonify, request
 
 from ..extensions import db
-from ..models import Employee
+from ..models import Employee, FaceSample
 from ..services.auth import (
     authenticate_manager,
     list_employees,
@@ -24,11 +26,35 @@ def _unauthorized():
     return jsonify({"status": "unauthorized"}), 401
 
 
+def _employee_not_found():
+    return jsonify({"status": "employee_not_found"}), 404
+
+
 def _normalize_text(value):
     if value is None:
         return None
     normalized = value.strip()
     return normalized or None
+
+
+def _get_employee(employee_id):
+    employee = db.session.get(Employee, employee_id)
+    if employee is None:
+        return None, _employee_not_found()
+    return employee, None
+
+
+def _serialize_face_sample(face_sample):
+    return {
+        "id": face_sample.id,
+        "sample_index": face_sample.sample_index,
+        "image_path": face_sample.image_path,
+        "created_at": face_sample.created_at.isoformat(),
+    }
+
+
+def _get_service(name):
+    return current_app.extensions[name]
 
 
 @manager_bp.post("/manager/login")
@@ -93,3 +119,149 @@ def manager_create_employee():
         raise
 
     return jsonify({"employee": serialize_employee(employee)}), 201
+
+
+@manager_bp.get("/manager/employees/<int:employee_id>/face-samples")
+def manager_employee_face_samples(employee_id):
+    _, error_response = require_manager()
+    if error_response is not None:
+        return error_response
+
+    employee, error_response = _get_employee(employee_id)
+    if error_response is not None:
+        return error_response
+
+    face_samples = (
+        FaceSample.query.filter_by(employee_id=employee.id)
+        .order_by(FaceSample.sample_index.asc())
+        .all()
+    )
+    return jsonify(
+        {
+            "employee": serialize_employee(employee),
+            "face_samples": [_serialize_face_sample(face_sample) for face_sample in face_samples],
+        }
+    )
+
+
+@manager_bp.post("/manager/employees/<int:employee_id>/face-enrollment")
+def manager_employee_face_enrollment(employee_id):
+    _, error_response = require_manager()
+    if error_response is not None:
+        return error_response
+
+    employee, error_response = _get_employee(employee_id)
+    if error_response is not None:
+        return error_response
+
+    existing_face_sample = FaceSample.query.filter_by(employee_id=employee.id).first()
+    if existing_face_sample is not None:
+        return jsonify({"status": "face_registration_exists"}), 409
+
+    images = request.files.getlist("images")
+    if len(images) != 5:
+        return _invalid_request("exactly 5 images are required")
+
+    storage_service = _get_service("storage_service")
+    embedding_service = _get_service("embedding_service")
+    face_index_service = _get_service("face_index_service")
+
+    prepared_samples = []
+    saved_paths = []
+
+    for sample_index, image in enumerate(images, start=1):
+        if image is None or not image.filename:
+            storage_service.remove_employee_face_files(saved_paths)
+            return _invalid_request("images are required")
+
+        frame_bytes = image.read()
+        if not frame_bytes:
+            storage_service.remove_employee_face_files(saved_paths)
+            return _invalid_request("images are required")
+
+        embeddings = embedding_service.extract_embeddings(frame_bytes)
+        if len(embeddings) == 0:
+            storage_service.remove_employee_face_files(saved_paths)
+            return jsonify({"status": "no_face", "image_index": sample_index}), 400
+        if len(embeddings) > 1:
+            storage_service.remove_employee_face_files(saved_paths)
+            return (
+                jsonify(
+                    {
+                        "status": "multiple_faces",
+                        "image_index": sample_index,
+                        "faces_detected": len(embeddings),
+                    }
+                ),
+                400,
+            )
+
+        image_path = storage_service.save_employee_face_sample(
+            employee.id,
+            sample_index,
+            frame_bytes,
+            filename=image.filename,
+        )
+        saved_paths.append(image_path)
+        prepared_samples.append(
+            FaceSample(
+                employee_id=employee.id,
+                sample_index=sample_index,
+                image_path=str(image_path),
+                embedding_json=json.dumps(embeddings[0]),
+            )
+        )
+
+    try:
+        db.session.add_all(prepared_samples)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        storage_service.remove_employee_face_files(saved_paths)
+        if FaceSample.query.filter_by(employee_id=employee.id).first() is not None:
+            return jsonify({"status": "face_registration_exists"}), 409
+        raise
+    except Exception:
+        db.session.rollback()
+        storage_service.remove_employee_face_files(saved_paths)
+        raise
+
+    face_index_service.refresh()
+    return (
+        jsonify(
+            {
+                "employee": serialize_employee(employee),
+                "face_samples": [_serialize_face_sample(face_sample) for face_sample in prepared_samples],
+                "face_sample_count": len(prepared_samples),
+            }
+        ),
+        201,
+    )
+
+
+@manager_bp.delete("/manager/employees/<int:employee_id>/face-samples")
+def manager_employee_face_samples_delete(employee_id):
+    _, error_response = require_manager()
+    if error_response is not None:
+        return error_response
+
+    employee, error_response = _get_employee(employee_id)
+    if error_response is not None:
+        return error_response
+
+    face_samples = (
+        FaceSample.query.filter_by(employee_id=employee.id)
+        .order_by(FaceSample.sample_index.asc())
+        .all()
+    )
+    deleted_count = len(face_samples)
+
+    for face_sample in face_samples:
+        db.session.delete(face_sample)
+    db.session.commit()
+
+    storage_service = _get_service("storage_service")
+    storage_service.remove_employee_face_files([face_sample.image_path for face_sample in face_samples])
+    _get_service("face_index_service").refresh()
+
+    return jsonify({"employee_id": employee.id, "deleted_count": deleted_count})
