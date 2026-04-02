@@ -6,15 +6,12 @@ class RecognitionService:
         self.attendance_service = attendance_service
 
     def process_guest_image(self, frame_bytes, filename=None, content_type=None):
-        embeddings = self.embedding_service.extract_embeddings(frame_bytes)
+        embedding = self.embedding_service.extract_embeddings(frame_bytes)
 
-        if not embeddings:
+        if not embedding:
             return {"status": "no_face"}
 
-        if len(embeddings) > 1:
-            return {"status": "multiple_faces", "faces_detected": len(embeddings)}
-
-        match = self.face_index_service.find_match(embeddings[0])
+        match = self.face_index_service.find_match(embedding)
         if match is None:
             return {"status": "unknown"}
 

@@ -42,7 +42,7 @@ class FaceIndexService:
         best_match = None
 
         for entry in self._entries:
-            distance = _euclidean_distance(query_embedding, entry["embedding"])
+            distance = _cosine_distance(query_embedding, entry["embedding"])
             if best_match is None or distance < best_match["distance"]:
                 best_match = {
                     "employee_id": entry["employee_id"],
@@ -56,8 +56,15 @@ class FaceIndexService:
         return None
 
 
-def _euclidean_distance(left, right):
+def _cosine_distance(left, right):
     if len(left) != len(right):
         return math.inf
 
-    return math.sqrt(sum((left_value - right_value) ** 2 for left_value, right_value in zip(left, right)))
+    left_norm = math.sqrt(sum(value * value for value in left))
+    right_norm = math.sqrt(sum(value * value for value in right))
+    if left_norm == 0 or right_norm == 0:
+        return math.inf
+
+    dot_product = sum(left_value * right_value for left_value, right_value in zip(left, right))
+    cosine_similarity = dot_product / (left_norm * right_norm)
+    return 1 - cosine_similarity

@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -11,7 +12,8 @@ class StorageService:
         if not suffix:
             suffix = ".bin"
 
-        snapshot_path = self.checkin_dir / f"{uuid4().hex}{suffix}"
+        date_dir = self.checkin_dir / datetime.utcnow().date().isoformat()
+        snapshot_path = date_dir / f"{uuid4().hex}{suffix}"
         snapshot_path.parent.mkdir(parents=True, exist_ok=True)
         snapshot_path.write_bytes(frame_bytes)
         return snapshot_path
