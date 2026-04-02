@@ -1,6 +1,7 @@
 from io import BytesIO
 from pathlib import Path
 
+import pytest
 from werkzeug.datastructures import MultiDict
 
 try:
@@ -286,6 +287,81 @@ def test_face_enrollment_all_or_nothing_cleans_partial_rows_and_files(app, clien
 
     with app.app_context():
         assert FaceSample.query.filter_by(employee_id=employee["id"]).count() == 0
+
+
+def test_face_enrollment_cleans_up_on_unexpected_mid_batch_exception(app, client):
+    manager = _create_manager(app)
+    employee = _create_employee(app, employee_code="EMP-309", full_name="Boom Mid Batch")
+    _login_manager(client, manager)
+
+    class BoomEmbeddingService:
+        def __init__(self):
+            self.calls = 0
+
+        def extract_embeddings(self, frame_bytes):
+            self.calls += 1
+            if self.calls == 3:
+                raise RuntimeError("boom")
+            return [[0.1, 0.2, 0.3]]
+
+    class UnexpectedRefreshService:
+        def refresh(self):
+            raise AssertionError("refresh should not be called on failure")
+
+    embedding_service = BoomEmbeddingService()
+    app.extensions["embedding_service"] = embedding_service
+    app.extensions["face_index_service"] = UnexpectedRefreshService()
+
+    with pytest.raises(RuntimeError):
+        client.post(
+            f"/api/manager/employees/{employee['id']}/face-enrollment",
+            data=_make_enrollment_payload("boom"),
+            content_type="multipart/form-data",
+        )
+
+    with app.app_context():
+        assert FaceSample.query.filter_by(employee_id=employee["id"]).count() == 0
+
+    assert list(Path(app.config["FACES_DIR"]).rglob("*")) == []
+
+
+def test_enrolled_faces_are_immediately_visible_to_guest_recognition(app, client):
+    manager = _create_manager(app)
+    employee = _create_employee(app, employee_code="EMP-310", full_name="Recognition Ready")
+    _login_manager(client, manager)
+
+    class FixedEnrollmentEmbeddingService:
+        def extract_embeddings(self, frame_bytes):
+            return [[0.1, 0.2, 0.3]]
+
+    class FixedGuestEmbeddingService:
+        def extract_embeddings(self, frame_bytes):
+            return [[0.1, 0.2, 0.3]]
+
+    app.extensions["embedding_service"] = FixedEnrollmentEmbeddingService()
+
+    enrollment_response = client.post(
+        f"/api/manager/employees/{employee['id']}/face-enrollment",
+        data=_make_enrollment_payload("ready"),
+        content_type="multipart/form-data",
+    )
+
+    assert enrollment_response.status_code == 201
+
+    app.extensions["recognition_service"].embedding_service = FixedGuestEmbeddingService()
+
+    guest_response = client.post(
+        "/api/guest/checkin",
+        data={"frame": (BytesIO(b"guest-frame"), "guest.jpg")},
+        content_type="multipart/form-data",
+    )
+
+    assert guest_response.status_code == 200
+    payload = guest_response.get_json()
+    assert payload["status"] == "recognized"
+    assert payload["employee_id"] == employee["id"]
+    assert payload["employee_code"] == "EMP-310"
+    assert payload["full_name"] == "Recognition Ready"
 
 
 def test_face_deletion_requires_authentication(client):

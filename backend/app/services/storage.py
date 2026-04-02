@@ -40,7 +40,10 @@ class StorageService:
         for image_path in image_paths:
             path = Path(image_path)
             employee_dirs.add(path.parent)
-            path.unlink(missing_ok=True)
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
 
         for employee_dir in employee_dirs:
             try:

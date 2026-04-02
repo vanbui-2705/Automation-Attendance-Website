@@ -169,50 +169,50 @@ def manager_employee_face_enrollment(employee_id):
     prepared_samples = []
     saved_paths = []
 
-    for sample_index, image in enumerate(images, start=1):
-        if image is None or not image.filename:
-            storage_service.remove_employee_face_files(saved_paths)
-            return _invalid_request("images are required")
-
-        frame_bytes = image.read()
-        if not frame_bytes:
-            storage_service.remove_employee_face_files(saved_paths)
-            return _invalid_request("images are required")
-
-        embeddings = embedding_service.extract_embeddings(frame_bytes)
-        if len(embeddings) == 0:
-            storage_service.remove_employee_face_files(saved_paths)
-            return jsonify({"status": "no_face", "image_index": sample_index}), 400
-        if len(embeddings) > 1:
-            storage_service.remove_employee_face_files(saved_paths)
-            return (
-                jsonify(
-                    {
-                        "status": "multiple_faces",
-                        "image_index": sample_index,
-                        "faces_detected": len(embeddings),
-                    }
-                ),
-                400,
-            )
-
-        image_path = storage_service.save_employee_face_sample(
-            employee.id,
-            sample_index,
-            frame_bytes,
-            filename=image.filename,
-        )
-        saved_paths.append(image_path)
-        prepared_samples.append(
-            FaceSample(
-                employee_id=employee.id,
-                sample_index=sample_index,
-                image_path=str(image_path),
-                embedding_json=json.dumps(embeddings[0]),
-            )
-        )
-
     try:
+        for sample_index, image in enumerate(images, start=1):
+            if image is None or not image.filename:
+                storage_service.remove_employee_face_files(saved_paths)
+                return _invalid_request("images are required")
+
+            frame_bytes = image.read()
+            if not frame_bytes:
+                storage_service.remove_employee_face_files(saved_paths)
+                return _invalid_request("images are required")
+
+            embeddings = embedding_service.extract_embeddings(frame_bytes)
+            if len(embeddings) == 0:
+                storage_service.remove_employee_face_files(saved_paths)
+                return jsonify({"status": "no_face", "image_index": sample_index}), 400
+            if len(embeddings) > 1:
+                storage_service.remove_employee_face_files(saved_paths)
+                return (
+                    jsonify(
+                        {
+                            "status": "multiple_faces",
+                            "image_index": sample_index,
+                            "faces_detected": len(embeddings),
+                        }
+                    ),
+                    400,
+                )
+
+            image_path = storage_service.save_employee_face_sample(
+                employee.id,
+                sample_index,
+                frame_bytes,
+                filename=image.filename,
+            )
+            saved_paths.append(image_path)
+            prepared_samples.append(
+                FaceSample(
+                    employee_id=employee.id,
+                    sample_index=sample_index,
+                    image_path=str(image_path),
+                    embedding_json=json.dumps(embeddings[0]),
+                )
+            )
+
         db.session.add_all(prepared_samples)
         db.session.commit()
     except IntegrityError:
