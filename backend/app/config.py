@@ -7,6 +7,5 @@ class Config:
     APP_DB_PATH = DATA_DIR / "app.db"
     CHECKIN_DIR = DATA_DIR / "checkins"
     FACES_DIR = DATA_DIR / "faces"
-    SQLALCHEMY_DATABASE_URI = f"sqlite:///{APP_DB_PATH.as_posix()}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     MAX_CONTENT_LENGTH = 3 * 1024 * 1024
