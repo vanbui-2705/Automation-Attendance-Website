@@ -126,3 +126,5 @@ export function EmployeeListPage() {
     </div>
   );
 }
+
+export default EmployeeListPage;

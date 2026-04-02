@@ -164,3 +164,5 @@ export function EmployeeFacesPage() {
     </div>
   );
 }
+
+export default EmployeeFacesPage;

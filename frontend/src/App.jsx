@@ -1,37 +1,38 @@
-import { Navigate, Outlet, Route, Routes } from "react-router-dom";
-
+import { Navigate, Route, Routes } from "react-router-dom";
 import { ManagerAuthProvider } from "./context/ManagerAuthContext";
-import { ManagerLayout } from "./components/ManagerLayout";
-import { ProtectedRoute } from "./components/ProtectedRoute";
-import { EmployeeFacesPage } from "./pages/EmployeeFacesPage";
-import { EmployeeListPage } from "./pages/EmployeeListPage";
-import GuestPlaceholderPage from "./pages/GuestPlaceholderPage";
-import { LandingPage } from "./pages/LandingPage";
-import { ManagerLoginPage } from "./pages/ManagerLoginPage";
-
-function ManagerRoutes() {
-  return (
-    <ProtectedRoute>
-      <ManagerLayout>
-        <Outlet />
-      </ManagerLayout>
-    </ProtectedRoute>
-  );
-}
+import ProtectedRoute from "./components/ProtectedRoute";
+import ManagerLayout from "./components/ManagerLayout";
+import LandingPage from "./pages/LandingPage";
+import GuestCheckinPage from "./pages/GuestCheckinPage";
+import ManagerLoginPage from "./pages/ManagerLoginPage";
+import EmployeeListPage from "./pages/EmployeeListPage";
+import EmployeeFacesPage from "./pages/EmployeeFacesPage";
+import AttendancePage from "./pages/AttendancePage";
 
 export function App() {
   return (
     <ManagerAuthProvider>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/guest" element={<GuestPlaceholderPage />} />
+        <Route path="/guest" element={<GuestCheckinPage />} />
         <Route path="/manager/login" element={<ManagerLoginPage />} />
-        <Route path="/manager" element={<ManagerRoutes />}>
+        <Route
+          path="/manager"
+          element={
+            <ProtectedRoute>
+              <ManagerLayout />
+            </ProtectedRoute>
+          }
+        >
           <Route index element={<Navigate to="/manager/employees" replace />} />
           <Route path="employees" element={<EmployeeListPage />} />
           <Route path="employees/:employeeId/faces" element={<EmployeeFacesPage />} />
+          <Route path="attendance" element={<AttendancePage />} />
         </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </ManagerAuthProvider>
   );
 }
+
+export default App;

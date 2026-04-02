@@ -1,22 +1,33 @@
-import { Link, Outlet } from "react-router-dom";
-
+import { NavLink, Outlet } from "react-router-dom";
 import { useManagerAuth } from "../context/ManagerAuthContext";
 
-export function ManagerLayout({ children }) {
-  const { manager } = useManagerAuth();
+export default function ManagerLayout() {
+  const { manager, logout } = useManagerAuth();
 
   return (
-    <main className="app-shell">
-      <div className="page-frame">
-        <header className="topbar">
-          <Link to="/manager/employees" className="brand-mark" aria-label="Auto Attendance home">
-            <span className="brand-dot" />
-            <span>Auto Attendance</span>
-          </Link>
-          <span className="status">Manager: {manager?.username ?? "Signed in"}</span>
-        </header>
-        <section className="surface page-transition">{children ?? <Outlet />}</section>
-      </div>
-    </main>
+    <div className="manager-shell">
+      <aside className="manager-sidebar">
+        <div>
+          <p className="section-eyebrow">Manager Console</p>
+          <h1>Auto Attendance</h1>
+          {manager?.username ? <p className="manager-meta">Dang nhap: {manager.username}</p> : null}
+        </div>
+
+        <nav className="manager-nav" aria-label="Manager navigation">
+          <NavLink to="/manager/employees">Nhan vien</NavLink>
+          <NavLink to="/manager/attendance">Cham cong</NavLink>
+        </nav>
+
+        {typeof logout === "function" ? (
+          <button type="button" className="manager-logout" onClick={logout}>
+            Dang xuat
+          </button>
+        ) : null}
+      </aside>
+
+      <main className="manager-main">
+        <Outlet />
+      </main>
+    </div>
   );
 }

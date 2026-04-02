@@ -70,3 +70,5 @@ export function ManagerLoginPage() {
     </main>
   );
 }
+
+export default ManagerLoginPage;

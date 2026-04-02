@@ -22,3 +22,5 @@ export function ProtectedRoute({ children }) {
 
   return children ?? <Outlet />;
 }
+
+export default ProtectedRoute;
