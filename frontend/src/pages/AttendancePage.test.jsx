@@ -1,11 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import AttendancePage from "./AttendancePage";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { listAttendance } from "../lib/attendanceApi";
+import { renderApp } from "../test/test-utils";
 
 vi.mock("../lib/attendanceApi", () => ({
   listAttendance: vi.fn(),
 }));
+
+function stubManagerSession(...responses) {
+  const fetchMock = vi.fn();
+  responses.forEach((response) => {
+    fetchMock.mockResolvedValueOnce(response);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+}
 
 describe("AttendancePage", () => {
   afterEach(() => {
@@ -13,6 +21,12 @@ describe("AttendancePage", () => {
   });
 
   it("loads today attendance on mount and renders rows", async () => {
+    stubManagerSession(
+      new Response(JSON.stringify({ manager: { id: 1, username: "manager" } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
     listAttendance.mockResolvedValueOnce({
       filters: { from: "2026-04-03", to: "2026-04-03", search: "" },
       summary: { total_records: 1 },
@@ -28,7 +42,7 @@ describe("AttendancePage", () => {
       ],
     });
 
-    render(<AttendancePage />);
+    renderApp("/manager/attendance");
 
     await waitFor(() => {
       expect(listAttendance).toHaveBeenCalled();
@@ -53,6 +67,12 @@ describe("AttendancePage", () => {
   });
 
   it("updates the request when filters are submitted", async () => {
+    stubManagerSession(
+      new Response(JSON.stringify({ manager: { id: 1, username: "manager" } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
     listAttendance
       .mockResolvedValueOnce({
         filters: { from: "2026-04-03", to: "2026-04-03", search: "" },
@@ -74,7 +94,7 @@ describe("AttendancePage", () => {
         ],
       });
 
-    render(<AttendancePage />);
+    renderApp("/manager/attendance");
 
     await waitFor(() => expect(listAttendance).toHaveBeenCalledTimes(1));
 
@@ -93,26 +113,59 @@ describe("AttendancePage", () => {
   });
 
   it("renders empty state when there are no records", async () => {
+    stubManagerSession(
+      new Response(JSON.stringify({ manager: { id: 1, username: "manager" } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
     listAttendance.mockResolvedValueOnce({
       filters: { from: "2026-04-03", to: "2026-04-03", search: "" },
       summary: { total_records: 0 },
       records: [],
     });
 
-    render(<AttendancePage />);
+    renderApp("/manager/attendance");
 
     expect(await screen.findByText("Khong co ban ghi")).toBeInTheDocument();
     expect(screen.getByText("Hay thu doi bo loc ngay hoac tim kiem khac.")).toBeInTheDocument();
   });
 
-  it("renders a friendly error for invalid filters", async () => {
+  it("renders backend invalid_request messages for invalid filters", async () => {
+    stubManagerSession(
+      new Response(JSON.stringify({ manager: { id: 1, username: "manager" } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
     listAttendance.mockRejectedValueOnce({
       status: 400,
-      payload: { status: "invalid_date_range" },
+      payload: { status: "invalid_request", message: "from must be less than or equal to to" },
     });
 
-    render(<AttendancePage />);
+    renderApp("/manager/attendance");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Khoang ngay khong hop le.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("from must be less than or equal to to");
+  });
+
+  it("redirects to login when attendance load returns unauthorized", async () => {
+    stubManagerSession(
+      new Response(JSON.stringify({ manager: { id: 1, username: "manager" } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+      new Response(JSON.stringify({ status: "unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    listAttendance.mockRejectedValueOnce({
+      status: 401,
+      payload: { status: "unauthorized", message: "Ban can dang nhap lai." },
+    });
+
+    renderApp("/manager/attendance");
+
+    expect(await screen.findByRole("heading", { name: /sign in to manage employees/i })).toBeInTheDocument();
   });
 });

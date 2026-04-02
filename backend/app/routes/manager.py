@@ -82,6 +82,21 @@ def _get_service(name):
     return current_app.extensions[name]
 
 
+def _resolve_checkin_snapshot_path(snapshot_path_value):
+    checkin_dir = Path(current_app.config["CHECKIN_DIR"]).resolve()
+    candidate_path = Path(snapshot_path_value)
+    if not candidate_path.is_absolute():
+        candidate_path = checkin_dir / candidate_path
+
+    resolved_path = candidate_path.resolve(strict=False)
+    try:
+        resolved_path.relative_to(checkin_dir)
+    except ValueError:
+        return None
+
+    return resolved_path
+
+
 @manager_bp.post("/manager/login")
 def manager_login():
     payload = request.get_json(silent=True) or {}
@@ -359,8 +374,8 @@ def manager_attendance_snapshot(attendance_id):
     if attendance_event is None:
         return _attendance_not_found()
 
-    snapshot_path = Path(attendance_event.snapshot_path)
-    if not snapshot_path.exists():
+    snapshot_path = _resolve_checkin_snapshot_path(attendance_event.snapshot_path)
+    if snapshot_path is None or not snapshot_path.exists() or not snapshot_path.is_file():
         return _snapshot_not_found()
 
     mime_type = mimetypes.guess_type(snapshot_path.name)[0] or "application/octet-stream"

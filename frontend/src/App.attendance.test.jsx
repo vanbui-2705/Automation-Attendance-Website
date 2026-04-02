@@ -34,4 +34,20 @@ describe("attendance route", () => {
     expect(await screen.findByRole("heading", { name: "Nhật ký chấm công" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Cham cong" })).toBeInTheDocument();
   });
+
+  it("redirects unauthenticated attendance access to manager login", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ status: "unauthorized" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    renderApp("/manager/attendance");
+
+    expect(await screen.findByRole("heading", { name: /sign in to manage employees/i })).toBeInTheDocument();
+  });
 });

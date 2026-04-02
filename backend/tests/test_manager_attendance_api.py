@@ -243,3 +243,29 @@ def test_manager_attendance_snapshot_returns_404_for_missing_file(app, client):
 
     assert response.status_code == 404
     assert response.get_json()["status"] == "snapshot_not_found"
+
+
+def test_manager_attendance_snapshot_rejects_paths_outside_checkin_dir(app, client):
+    manager = _create_manager(app)
+    employee = _create_employee(app, employee_code="EMP-606", full_name="Ada Lovelace")
+    outside_snapshot_path = app.config["CHECKIN_DIR"].parent / "outside-snapshot.jpg"
+    outside_snapshot_path.write_bytes(b"outside-bytes")
+
+    with app.app_context():
+        event = AttendanceEvent(
+            employee_id=employee["id"],
+            checked_in_at=datetime(2026, 4, 3, 8, 0, 0),
+            checkin_date="2026-04-03",
+            snapshot_path=str(outside_snapshot_path),
+            distance=0.123,
+        )
+        db.session.add(event)
+        db.session.commit()
+        event_id = event.id
+
+    _login_manager(client, manager)
+
+    response = client.get(f"/api/manager/attendance/{event_id}/snapshot")
+
+    assert response.status_code == 404
+    assert response.get_json()["status"] == "snapshot_not_found"

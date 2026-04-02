@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { listAttendance } from "../lib/attendanceApi";
+import { useManagerAuth } from "../context/ManagerAuthContext";
 import "./AttendancePage.css";
 
 function pad(value) {
@@ -20,19 +22,19 @@ function formatCheckedInAt(value) {
 
 function normalizeError(error) {
   const status = error?.payload?.status || error?.status;
-  if (status === "invalid_date_range") {
-    return "Khoang ngay khong hop le.";
-  }
-  if (status === "invalid_date_format") {
-    return "Dinh dang ngay khong hop le.";
-  }
   if (status === "unauthorized") {
     return "Ban can dang nhap lai.";
+  }
+  if (status === "invalid_request" && error?.payload?.message) {
+    return error.payload.message;
   }
   return error?.payload?.message || error?.message || "Khong the tai du lieu cham cong.";
 }
 
 export default function AttendancePage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { setUnauthenticated } = useManagerAuth();
   const today = useMemo(() => getLocalDateValue(), []);
   const [filters, setFilters] = useState({
     from: today,
@@ -63,6 +65,12 @@ export default function AttendancePage() {
         setRecords(payload.records || []);
         setSummary(payload.summary || { total_records: 0 });
       } catch (caughtError) {
+        if (caughtError?.status === 401 && !cancelled) {
+          setUnauthenticated();
+          cancelled = true;
+          navigate("/manager/login", { replace: true, state: { from: location.pathname } });
+          return;
+        }
         if (!cancelled) {
           setError(normalizeError(caughtError));
           setRecords([]);
