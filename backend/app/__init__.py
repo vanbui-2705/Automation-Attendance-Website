@@ -4,7 +4,13 @@ from flask import Flask
 
 from .config import Config
 from .extensions import db
+from .routes.guest import guest_bp
 from .routes.health import health_bp
+from .services.attendance import AttendanceService
+from .services.embedding import EmbeddingService
+from .services.face_index import FaceIndexService
+from .services.recognition import RecognitionService
+from .services.storage import StorageService
 
 
 def _resolve_paths(app):
@@ -30,6 +36,25 @@ def _initialize_database(app):
         db.create_all()
 
 
+def _initialize_services(app):
+    storage_service = StorageService(app.config["CHECKIN_DIR"])
+    embedding_service = EmbeddingService()
+    face_index_service = FaceIndexService()
+    attendance_service = AttendanceService()
+    recognition_service = RecognitionService(
+        storage_service=storage_service,
+        embedding_service=embedding_service,
+        face_index_service=face_index_service,
+        attendance_service=attendance_service,
+    )
+
+    app.extensions["storage_service"] = storage_service
+    app.extensions["embedding_service"] = embedding_service
+    app.extensions["face_index_service"] = face_index_service
+    app.extensions["attendance_service"] = attendance_service
+    app.extensions["recognition_service"] = recognition_service
+
+
 def create_app(test_config=None):
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -40,6 +65,8 @@ def create_app(test_config=None):
     _resolve_paths(app)
     _configure_storage(app)
     _initialize_database(app)
+    _initialize_services(app)
     app.register_blueprint(health_bp, url_prefix="/api")
+    app.register_blueprint(guest_bp, url_prefix="/api")
 
     return app
