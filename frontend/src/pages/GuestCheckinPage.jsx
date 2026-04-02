@@ -23,7 +23,8 @@ function GuestCheckinPage() {
 
   const isScanning = scanMode === 'scanning' && cooldownSeconds === 0
   const isBusy = submissionState === 'loading'
-  const cameraUnavailable = cameraState === 'denied' || cameraState === 'unsupported'
+  const cameraUnavailable = ['denied', 'unavailable', 'unsupported'].includes(cameraState)
+  const manualSubmissionBlocked = isBusy || cooldownSeconds > 0 || scanMode === 'scanning'
 
   const resultCopy = useMemo(() => {
     if (!result) return null
@@ -70,7 +71,7 @@ function GuestCheckinPage() {
     }
 
     if (cameraUnavailable) {
-      setStatusText('Camera khong kha dung. Ban co the tai anh len thay the.')
+      setStatusText(cameraError || 'Camera khong kha dung. Ban co the tai anh len thay the.')
       return
     }
 
@@ -158,11 +159,11 @@ function GuestCheckinPage() {
   }
 
   async function handleStartScanning() {
-    if (cooldownSeconds > 0 || isBusy) return
-    setScanMode('scanning')
-    if (cameraUnavailable) {
-      setStatusText('Ban co the dung anh tai len neu camera khong san sang.')
+    if (isBusy || cameraState !== 'ready') return
+    if (cooldownSeconds > 0) {
+      setCooldownSeconds(0)
     }
+    setScanMode('scanning')
   }
 
   function handleStopScanning() {
@@ -174,6 +175,11 @@ function GuestCheckinPage() {
 
     if (!manualFile) {
       setStatusText('Hay chon mot anh truoc khi gui.')
+      return
+    }
+
+    if (manualSubmissionBlocked || inFlightRef.current) {
+      setStatusText('Hay doi he thong xu ly xong roi thu lai.')
       return
     }
 
@@ -248,7 +254,7 @@ function GuestCheckinPage() {
               type="button"
               className="primary-button"
               onClick={handleStartScanning}
-              disabled={cameraState !== 'ready' || isScanning || isBusy || cooldownSeconds > 0}
+              disabled={cameraState !== 'ready' || isBusy || isScanning}
             >
               Bat dau quet
             </button>
@@ -264,7 +270,7 @@ function GuestCheckinPage() {
               type="button"
               className="ghost-button"
               onClick={() => void handleStartScanning()}
-              disabled={cameraState !== 'ready' || isBusy || cooldownSeconds > 0}
+              disabled={cameraState !== 'ready' || isBusy || isScanning}
             >
               Quet lai
             </button>
@@ -318,7 +324,11 @@ function GuestCheckinPage() {
               onChange={handleFileChange}
               aria-label="Tai anh check-in"
             />
-            <button type="submit" className="secondary-button" disabled={isBusy}>
+            <button
+              type="submit"
+              className="secondary-button"
+              disabled={!manualFile || manualSubmissionBlocked || inFlightRef.current}
+            >
               Gui anh
             </button>
           </form>

@@ -37,7 +37,7 @@ export function useGuestCamera() {
 
   const startCamera = useCallback(async () => {
     if (!navigator?.mediaDevices?.getUserMedia) {
-      setCameraState('unsupported')
+      setCameraState('unavailable')
       setCameraError('Trinh duyet nay khong ho tro camera browser.')
       return false
     }
@@ -64,7 +64,14 @@ export function useGuestCamera() {
       setCameraState('ready')
       return true
     } catch (error) {
-      setCameraState(error?.name === 'NotAllowedError' ? 'denied' : 'error')
+      const nextState =
+        error?.name === 'NotAllowedError'
+          ? 'denied'
+          : error?.name === 'NotFoundError'
+            ? 'unavailable'
+            : 'error'
+
+      setCameraState(nextState)
       setCameraError(getCameraErrorMessage(error))
       return false
     }
