@@ -7,10 +7,11 @@ import { useManagerAuth } from "../context/ManagerAuthContext";
 
 export function EmployeeListPage() {
   const navigate = useNavigate();
-  const { manager, setUnauthenticated } = useManagerAuth();
+  const { setUnauthenticated } = useManagerAuth();
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState("info");
   const [code, setCode] = useState("");
   const [fullName, setFullName] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -29,6 +30,7 @@ export function EmployeeListPage() {
         return;
       }
       setMessage(error.message || "Failed to load employees");
+      setMessageType("error");
     } finally {
       setLoading(false);
     }
@@ -49,79 +51,110 @@ export function EmployeeListPage() {
       setCode("");
       setFullName("");
       await loadEmployees();
-      setMessage("Employee created successfully");
+      setMessage("Đã tạo nhân viên thành công!");
+      setMessageType("success");
     } catch (error) {
       if (error.status === 401) {
         setUnauthenticated();
         navigate("/manager/login", { replace: true });
         return;
       }
-      setMessage(getFriendlyErrorMessage(error, "Could not create employee. Please try again."));
+      setMessage(getFriendlyErrorMessage(error, "Không thể tạo nhân viên. Vui lòng thử lại."));
+      setMessageType("error");
     } finally {
       setSubmitting(false);
     }
   }
 
+  const activeCount = employees.filter((e) => e.is_active).length;
+
   return (
-    <div className="stack">
-      <div className="compact">
-        <p className="eyebrow">Employees</p>
-        <h2>Roster management</h2>
-        <p className="note">Signed in as {manager?.username ?? "manager"}.</p>
+    <div className="stack-lg page-transition">
+      {/* Page Header */}
+      <div className="page-header">
+        <div className="page-header-info">
+          <h1>Quản lý nhân viên</h1>
+          <p>
+            Tổng cộng {employees.length} nhân viên · {activeCount} đang hoạt động
+          </p>
+        </div>
       </div>
 
-      <div className="split">
-        <section className="compact">
-          <div className="row row-head" aria-hidden="true">
-            <span>Code</span>
-            <span>Name</span>
-            <span>Status</span>
-            <span>Faces</span>
-          </div>
-          {loading ? (
-            <div className="muted-box">Loading employees...</div>
-          ) : employees.length === 0 ? (
-            <div className="muted-box">No employees yet.</div>
-          ) : (
-            <div className="table">
-              {employees.map((employee) => (
-                <div className="row" key={employee.id}>
-                  <strong>{employee.employee_code}</strong>
-                  <span>{employee.full_name}</span>
-                  <span>{employee.is_active ? "Active" : "Inactive"}</span>
-                  <Link className="btn btn-ghost" to={`/manager/employees/${employee.id}/faces`}>
-                    Manage faces
-                  </Link>
-                </div>
-              ))}
-            </div>
-          )}
-          {message && (
-            <p
-              className={message.includes("successfully") ? "status" : "status error"}
-              role={message.includes("successfully") ? undefined : "alert"}
-            >
-              {message}
-            </p>
-          )}
-        </section>
+      {/* Alert message */}
+      {message && (
+        <div className={`alert alert-${messageType}`} role={messageType === "error" ? "alert" : undefined}>
+          {message}
+        </div>
+      )}
 
-        <section className="compact">
-          <h3>Create employee</h3>
-          <form className="field-grid" onSubmit={handleSubmit}>
-            <label className="field">
-              <span>Employee code</span>
-              <input value={code} onChange={(event) => setCode(event.target.value)} />
-            </label>
-            <label className="field">
-              <span>Full name</span>
-              <input value={fullName} onChange={(event) => setFullName(event.target.value)} />
-            </label>
+      {/* Main grid: Table left, Form right */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "var(--sp-6)", alignItems: "start" }}>
+
+        {/* Employee Table */}
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          {loading ? (
+            <div className="loading-row">
+              <div className="spinner" />
+              Đang tải danh sách nhân viên...
+            </div>
+          ) : employees.length === 0 ? (
+            <div className="empty-state">
+              <h3>Chưa có nhân viên nào</h3>
+              <p>Hãy tạo nhân viên đầu tiên ở bên phải.</p>
+            </div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Mã NV</th>
+                  <th>Họ tên</th>
+                  <th>Trạng thái</th>
+                  <th style={{ textAlign: "right" }}>Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {employees.map((employee) => (
+                  <tr key={employee.id}>
+                    <td><strong>{employee.employee_code}</strong></td>
+                    <td>{employee.full_name}</td>
+                    <td>
+                      <span className={`badge ${employee.is_active ? "badge-success" : "badge-error"}`}>
+                        {employee.is_active ? "Hoạt động" : "Ngưng"}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <Link className="btn btn-ghost btn-sm" to={`/manager/employees/${employee.id}/faces`}>
+                        Khuôn mặt →
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Create Employee Form */}
+        <div className="card stack">
+          <h3>Thêm nhân viên mới</h3>
+          <form className="field-group" onSubmit={handleSubmit}>
+            <div className="field">
+              <label htmlFor="emp-code">Mã nhân viên</label>
+              <input id="emp-code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="VD: NV001" />
+            </div>
+            <div className="field">
+              <label htmlFor="emp-name">Họ và tên</label>
+              <input id="emp-name" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="VD: Nguyễn Văn A" />
+            </div>
             <button className="btn btn-primary" type="submit" disabled={submitting}>
-              {submitting ? "Creating..." : "Create employee"}
+              {submitting ? (
+                <><div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Đang tạo...</>
+              ) : (
+                "Tạo nhân viên"
+              )}
             </button>
           </form>
-        </section>
+        </div>
       </div>
     </div>
   );

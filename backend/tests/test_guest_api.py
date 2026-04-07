@@ -55,13 +55,13 @@ def test_guest_checkin_returns_payload_from_recognition_service(app, client):
     ]
 
 
-def test_embedding_service_uses_deepface_arcface_wrapper(monkeypatch):
+def test_embedding_service_uses_deepface_arcface_wrapper(monkeypatch, tmp_path):
     captured = {}
 
     class FakeDeepFace:
         @staticmethod
         def represent(img_path, model_name, enforce_detection):
-            captured["img_path"] = img_path
+            captured["img_path_type"] = type(img_path).__name__
             captured["model_name"] = model_name
             captured["enforce_detection"] = enforce_detection
             return [
@@ -73,19 +73,25 @@ def test_embedding_service_uses_deepface_arcface_wrapper(monkeypatch):
     fake_module.DeepFace = FakeDeepFace
     monkeypatch.setitem(sys.modules, "deepface", fake_module)
 
+    # Create a minimal valid JPEG so cv2.imdecode succeeds
+    import cv2
+    import numpy as np
+
+    tiny_img = np.zeros((2, 2, 3), dtype=np.uint8)
+    _, jpeg_bytes = cv2.imencode(".jpg", tiny_img)
+    frame_bytes = jpeg_bytes.tobytes()
+
     try:
         from backend.app.services.embedding import EmbeddingService
     except ModuleNotFoundError:
         from app.services.embedding import EmbeddingService
 
-    embeddings = EmbeddingService().extract_embeddings(b"frame-bytes")
+    embeddings = EmbeddingService().extract_embeddings(frame_bytes)
 
     assert embeddings == [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
-    assert captured == {
-        "img_path": b"frame-bytes",
-        "model_name": "ArcFace",
-        "enforce_detection": False,
-    }
+    assert captured["img_path_type"] == "ndarray"
+    assert captured["model_name"] == "ArcFace"
+    assert captured["enforce_detection"] is False
 
 
 def test_storage_service_saves_guest_frame_under_dated_subdirectory(tmp_path, monkeypatch):

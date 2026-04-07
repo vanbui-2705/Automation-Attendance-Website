@@ -5,6 +5,7 @@ from flask import Flask
 from .config import Config
 from .extensions import db
 from .routes.manager import manager_bp
+from .routes.face_enrollment import face_enrollment_bp
 from .routes.guest import guest_bp
 from .routes.health import health_bp
 from .services.attendance import AttendanceService
@@ -70,5 +71,6 @@ def create_app(test_config=None):
     app.register_blueprint(health_bp, url_prefix="/api")
     app.register_blueprint(guest_bp, url_prefix="/api")
     app.register_blueprint(manager_bp, url_prefix="/api")
+    app.register_blueprint(face_enrollment_bp, url_prefix="/api")
 
     return app

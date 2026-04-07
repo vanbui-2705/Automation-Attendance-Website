@@ -1,6 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .extensions import db
+
+
+def _utcnow():
+    return datetime.now(timezone.utc)
 
 
 class ManagerUser(db.Model):
@@ -9,7 +13,7 @@ class ManagerUser(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(255), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
 
 
 class Employee(db.Model):
@@ -19,12 +23,12 @@ class Employee(db.Model):
     employee_code = db.Column(db.String(64), unique=True, nullable=False, index=True)
     full_name = db.Column(db.String(255), nullable=False)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
     updated_at = db.Column(
         db.DateTime,
         nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=_utcnow,
+        onupdate=_utcnow,
     )
 
 
@@ -37,7 +41,7 @@ class FaceSample(db.Model):
     sample_index = db.Column(db.Integer, nullable=False)
     image_path = db.Column(db.String(512), nullable=False)
     embedding_json = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
 
 
 class AttendanceEvent(db.Model):
@@ -50,4 +54,4 @@ class AttendanceEvent(db.Model):
     checkin_date = db.Column(db.String(10), nullable=False)
     snapshot_path = db.Column(db.String(512), nullable=False)
     distance = db.Column(db.Float, nullable=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)

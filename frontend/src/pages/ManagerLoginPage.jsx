@@ -29,43 +29,61 @@ export function ManagerLoginPage() {
       await signIn(username.trim(), password);
       navigate(location.state?.from || "/manager/employees", { replace: true });
     } catch (caughtError) {
-      setMessage(getFriendlyErrorMessage(caughtError, "Unable to sign in. Please try again."));
+      setMessage(getFriendlyErrorMessage(caughtError, "Không thể đăng nhập. Vui lòng thử lại."));
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <main className="app-shell">
-      <div className="page-frame">
-        <section className="surface page-transition">
-          <div className="stack">
-            <p className="eyebrow">Manager access</p>
-            <h2>Sign in to manage employees and face registrations.</h2>
-            <form className="field-grid" onSubmit={handleSubmit}>
-              <label className="field">
-                <span>Username</span>
-                <input value={username} onChange={(event) => setUsername(event.target.value)} />
-              </label>
-              <label className="field">
-                <span>Password</span>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                />
-              </label>
-              {message && (
-                <p className="status error" role="alert">
-                  {message}
-                </p>
-              )}
-              <button className="btn btn-primary" type="submit" disabled={submitting}>
-                {submitting ? "Signing in..." : "Sign in"}
-              </button>
-            </form>
+    <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--bg-main)" }}>
+      <div className="page-transition" style={{ width: "100%", maxWidth: 400, padding: "var(--sp-6)" }}>
+        <div className="card-elevated stack" style={{ padding: "var(--sp-8)" }}>
+          <div className="stack-sm" style={{ textAlign: "center", marginBottom: "var(--sp-4)" }}>
+            <h1 style={{ fontSize: "1.5rem" }}>Auto Attendance</h1>
+            <p style={{ color: "var(--text-secondary)", fontSize: "14px" }}>
+              Đăng nhập để quản lý nhân viên và khuôn mặt.
+            </p>
           </div>
-        </section>
+
+          <form className="field-group" onSubmit={handleSubmit}>
+            <div className="field">
+              <label htmlFor="login-user">Tên đăng nhập</label>
+              <input
+                id="login-user"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                placeholder="Nhập tên đăng nhập"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="login-pass">Mật khẩu</label>
+              <input
+                id="login-pass"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                placeholder="Nhập mật khẩu"
+              />
+            </div>
+
+            {message && (
+              <div className="alert alert-error" role="alert">
+                {message}
+              </div>
+            )}
+
+            <button className="btn btn-primary" type="submit" disabled={submitting} style={{ width: "100%", marginTop: "var(--sp-2)" }}>
+              {submitting ? (
+                <><div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Đang đăng nhập...</>
+              ) : (
+                "Đăng nhập"
+              )}
+            </button>
+          </form>
+        </div>
       </div>
     </main>
   );

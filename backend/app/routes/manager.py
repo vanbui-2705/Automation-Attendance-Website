@@ -1,5 +1,4 @@
 import mimetypes
-import json
 from datetime import datetime
 from pathlib import Path
 
@@ -7,79 +6,40 @@ from flask import Blueprint, current_app, jsonify, request, send_file, url_for
 from sqlalchemy.exc import IntegrityError
 
 from ..extensions import db
-from ..models import Employee, FaceSample
+from ..models import Employee
 from ..services.auth import (
     authenticate_manager,
     list_employees,
     login_manager,
+    logout_manager,
     require_manager,
     serialize_employee,
     serialize_manager,
+)
+from .helpers import (
+    attendance_not_found,
+    get_service,
+    invalid_request,
+    normalize_text,
+    snapshot_not_found,
 )
 
 
 manager_bp = Blueprint("manager", __name__)
 
 
-def _invalid_request(message):
-    return jsonify({"status": "invalid_request", "message": message}), 400
-
-
-def _unauthorized():
-    return jsonify({"status": "unauthorized"}), 401
-
-
-def _employee_not_found():
-    return jsonify({"status": "employee_not_found"}), 404
-
-
-def _attendance_not_found():
-    return jsonify({"status": "attendance_not_found"}), 404
-
-
-def _snapshot_not_found():
-    return jsonify({"status": "snapshot_not_found"}), 404
-
-
-def _normalize_text(value):
-    if value is None:
-        return None
-    normalized = value.strip()
-    return normalized or None
-
-
 def _parse_date(value, field_name):
     if value is None:
         return None, None
 
-    normalized = _normalize_text(value)
+    normalized = normalize_text(value)
     if not normalized:
-        return None, _invalid_request(f"{field_name} must be YYYY-MM-DD")
+        return None, invalid_request(f"{field_name} must be YYYY-MM-DD")
 
     try:
         return datetime.strptime(normalized, "%Y-%m-%d").date(), None
     except ValueError:
-        return None, _invalid_request(f"{field_name} must be YYYY-MM-DD")
-
-
-def _get_employee(employee_id):
-    employee = db.session.get(Employee, employee_id)
-    if employee is None:
-        return None, _employee_not_found()
-    return employee, None
-
-
-def _serialize_face_sample(face_sample):
-    return {
-        "id": face_sample.id,
-        "sample_index": face_sample.sample_index,
-        "image_path": face_sample.image_path,
-        "created_at": face_sample.created_at.isoformat(),
-    }
-
-
-def _get_service(name):
-    return current_app.extensions[name]
+        return None, invalid_request(f"{field_name} must be YYYY-MM-DD")
 
 
 def _resolve_checkin_snapshot_path(snapshot_path_value):
@@ -100,10 +60,10 @@ def _resolve_checkin_snapshot_path(snapshot_path_value):
 @manager_bp.post("/manager/login")
 def manager_login():
     payload = request.get_json(silent=True) or {}
-    username = _normalize_text(payload.get("username"))
-    password = _normalize_text(payload.get("password"))
+    username = normalize_text(payload.get("username"))
+    password = normalize_text(payload.get("password"))
     if not username or not password:
-        return _invalid_request("username and password are required")
+        return invalid_request("username and password are required")
 
     manager = authenticate_manager(username, password)
     if manager is None:
@@ -111,6 +71,12 @@ def manager_login():
 
     login_manager(manager)
     return jsonify({"manager": serialize_manager(manager)})
+
+
+@manager_bp.post("/manager/logout")
+def manager_logout():
+    logout_manager()
+    return jsonify({"status": "ok"})
 
 
 @manager_bp.get("/manager/me")
@@ -138,10 +104,10 @@ def manager_create_employee():
         return error_response
 
     payload = request.get_json(silent=True) or {}
-    employee_code = _normalize_text(payload.get("employee_code"))
-    full_name = _normalize_text(payload.get("full_name"))
+    employee_code = normalize_text(payload.get("employee_code"))
+    full_name = normalize_text(payload.get("full_name"))
     if not employee_code or not full_name:
-        return _invalid_request("employee_code and full_name are required")
+        return invalid_request("employee_code and full_name are required")
 
     existing_employee = Employee.query.filter_by(employee_code=employee_code).first()
     if existing_employee is not None:
@@ -159,152 +125,6 @@ def manager_create_employee():
         raise
 
     return jsonify({"employee": serialize_employee(employee)}), 201
-
-
-@manager_bp.get("/manager/employees/<int:employee_id>/face-samples")
-def manager_employee_face_samples(employee_id):
-    _, error_response = require_manager()
-    if error_response is not None:
-        return error_response
-
-    employee, error_response = _get_employee(employee_id)
-    if error_response is not None:
-        return error_response
-
-    face_samples = (
-        FaceSample.query.filter_by(employee_id=employee.id)
-        .order_by(FaceSample.sample_index.asc())
-        .all()
-    )
-    return jsonify(
-        {
-            "employee": serialize_employee(employee),
-            "face_samples": [_serialize_face_sample(face_sample) for face_sample in face_samples],
-        }
-    )
-
-
-@manager_bp.post("/manager/employees/<int:employee_id>/face-enrollment")
-def manager_employee_face_enrollment(employee_id):
-    _, error_response = require_manager()
-    if error_response is not None:
-        return error_response
-
-    employee, error_response = _get_employee(employee_id)
-    if error_response is not None:
-        return error_response
-
-    existing_face_sample = FaceSample.query.filter_by(employee_id=employee.id).first()
-    if existing_face_sample is not None:
-        return jsonify({"status": "face_registration_exists"}), 409
-
-    images = request.files.getlist("images")
-    if len(images) != 5:
-        return _invalid_request("exactly 5 images are required")
-
-    storage_service = _get_service("storage_service")
-    embedding_service = _get_service("embedding_service")
-    face_index_service = _get_service("face_index_service")
-
-    prepared_samples = []
-    saved_paths = []
-
-    try:
-        for sample_index, image in enumerate(images, start=1):
-            if image is None or not image.filename:
-                storage_service.remove_employee_face_files(saved_paths)
-                return _invalid_request("images are required")
-
-            frame_bytes = image.read()
-            if not frame_bytes:
-                storage_service.remove_employee_face_files(saved_paths)
-                return _invalid_request("images are required")
-
-            embeddings = embedding_service.extract_embeddings(frame_bytes)
-            if len(embeddings) == 0:
-                storage_service.remove_employee_face_files(saved_paths)
-                return jsonify({"status": "no_face", "image_index": sample_index}), 400
-            if len(embeddings) > 1:
-                storage_service.remove_employee_face_files(saved_paths)
-                return (
-                    jsonify(
-                        {
-                            "status": "multiple_faces",
-                            "image_index": sample_index,
-                            "faces_detected": len(embeddings),
-                        }
-                    ),
-                    400,
-                )
-
-            image_path = storage_service.save_employee_face_sample(
-                employee.id,
-                sample_index,
-                frame_bytes,
-                filename=image.filename,
-            )
-            saved_paths.append(image_path)
-            prepared_samples.append(
-                FaceSample(
-                    employee_id=employee.id,
-                    sample_index=sample_index,
-                    image_path=str(image_path),
-                    embedding_json=json.dumps(embeddings[0]),
-                )
-            )
-
-        db.session.add_all(prepared_samples)
-        db.session.commit()
-    except IntegrityError:
-        db.session.rollback()
-        storage_service.remove_employee_face_files(saved_paths)
-        if FaceSample.query.filter_by(employee_id=employee.id).first() is not None:
-            return jsonify({"status": "face_registration_exists"}), 409
-        raise
-    except Exception:
-        db.session.rollback()
-        storage_service.remove_employee_face_files(saved_paths)
-        raise
-
-    face_index_service.refresh()
-    return (
-        jsonify(
-            {
-                "employee": serialize_employee(employee),
-                "face_samples": [_serialize_face_sample(face_sample) for face_sample in prepared_samples],
-                "face_sample_count": len(prepared_samples),
-            }
-        ),
-        201,
-    )
-
-
-@manager_bp.delete("/manager/employees/<int:employee_id>/face-samples")
-def manager_employee_face_samples_delete(employee_id):
-    _, error_response = require_manager()
-    if error_response is not None:
-        return error_response
-
-    employee, error_response = _get_employee(employee_id)
-    if error_response is not None:
-        return error_response
-
-    face_samples = (
-        FaceSample.query.filter_by(employee_id=employee.id)
-        .order_by(FaceSample.sample_index.asc())
-        .all()
-    )
-    deleted_count = len(face_samples)
-
-    for face_sample in face_samples:
-        db.session.delete(face_sample)
-    db.session.commit()
-
-    storage_service = _get_service("storage_service")
-    storage_service.remove_employee_face_files([face_sample.image_path for face_sample in face_samples])
-    _get_service("face_index_service").refresh()
-
-    return jsonify({"employee_id": employee.id, "deleted_count": deleted_count})
 
 
 @manager_bp.get("/manager/attendance")
@@ -329,10 +149,10 @@ def manager_attendance():
         to_date = from_date
 
     if from_date > to_date:
-        return _invalid_request("from must be less than or equal to to")
+        return invalid_request("from must be less than or equal to to")
 
-    search = _normalize_text(request.args.get("search"))
-    attendance_service = _get_service("attendance_service")
+    search = normalize_text(request.args.get("search"))
+    attendance_service = get_service("attendance_service")
     rows = attendance_service.list_attendance_events(from_date=from_date, to_date=to_date, search=search)
 
     records = []
@@ -369,14 +189,14 @@ def manager_attendance_snapshot(attendance_id):
     if error_response is not None:
         return error_response
 
-    attendance_service = _get_service("attendance_service")
+    attendance_service = get_service("attendance_service")
     attendance_event = attendance_service.get_attendance_event(attendance_id)
     if attendance_event is None:
-        return _attendance_not_found()
+        return attendance_not_found()
 
     snapshot_path = _resolve_checkin_snapshot_path(attendance_event.snapshot_path)
     if snapshot_path is None or not snapshot_path.exists() or not snapshot_path.is_file():
-        return _snapshot_not_found()
+        return snapshot_not_found()
 
     mime_type = mimetypes.guess_type(snapshot_path.name)[0] or "application/octet-stream"
     return send_file(snapshot_path, mimetype=mime_type)

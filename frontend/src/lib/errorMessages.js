@@ -8,6 +8,7 @@ const FRIENDLY_ERROR_MESSAGES = {
   multiple_faces: 'Trong khung hinh co nhieu hon mot khuon mat. Hay de chi mot nguoi vao khung.',
   network_error: 'Khong the ket noi toi may chu. Hay thu lai.',
   no_face: 'Khong phat hien khuon mat. Hay dieu chinh goc nhin va thu lai.',
+  rate_limited: 'Ban dang gui qua nhieu yeu cau. Hay doi vai giay roi thu lai.',
   unauthorized: 'Ban can dang nhap lai.',
   unknown: 'Khong xac dinh duoc khuon mat. Hay thu lai.',
 }

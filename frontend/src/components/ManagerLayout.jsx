@@ -7,25 +7,33 @@ export default function ManagerLayout() {
   return (
     <div className="manager-shell">
       <aside className="manager-sidebar">
-        <div>
-          <p className="section-eyebrow">Manager Console</p>
-          <h1>Auto Attendance</h1>
-          {manager?.username ? <p className="manager-meta">Dang nhap: {manager.username}</p> : null}
+        <div className="sidebar-brand">
+          <h2>Auto Attendance</h2>
+          {manager?.username ? (
+            <p>Xin chào, {manager.username}</p>
+          ) : null}
         </div>
 
         <nav className="manager-nav" aria-label="Manager navigation">
-          <NavLink to="/manager/employees">Nhan vien</NavLink>
-          <NavLink to="/manager/attendance">Cham cong</NavLink>
+          <NavLink to="/manager/employees">
+            <span className="nav-icon">👥</span>
+            Nhân viên
+          </NavLink>
+          <NavLink to="/manager/attendance">
+            <span className="nav-icon">📋</span>
+            Chấm công
+          </NavLink>
         </nav>
 
         {typeof logout === "function" ? (
           <button type="button" className="manager-logout" onClick={logout}>
-            Dang xuat
+            <span className="nav-icon">↩</span>
+            Đăng xuất
           </button>
         ) : null}
       </aside>
 
-      <main className="manager-main">
+      <main className="manager-main page-transition">
         <Outlet />
       </main>
     </div>

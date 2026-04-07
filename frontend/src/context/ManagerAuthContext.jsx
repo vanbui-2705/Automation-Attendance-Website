@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 
-import { getCurrentManager, loginManager } from "../lib/api";
+import { getCurrentManager, loginManager, logoutManager } from "../lib/api";
 
 const ManagerAuthContext = createContext(null);
 
@@ -60,7 +60,12 @@ export function ManagerAuthProvider({ children }) {
     return response.manager;
   }
 
-  function signOut() {
+  async function signOut() {
+    try {
+      await logoutManager();
+    } catch {
+      // Server-side session clear failed — still clear local state
+    }
     setManager(null);
     setStatus("unauthenticated");
   }
@@ -72,6 +77,7 @@ export function ManagerAuthProvider({ children }) {
     setError,
     signIn,
     signOut,
+    logout: signOut,
     setUnauthenticated: () => {
       setManager(null);
       setStatus("unauthenticated");

@@ -5,6 +5,8 @@ import { deleteFaceSamples, enrollFaceSamples, getFaceSamples } from "../lib/api
 import { getFriendlyErrorMessage } from "../lib/errorMessages";
 import { useManagerAuth } from "../context/ManagerAuthContext";
 
+const TOTAL_SLOTS = 5;
+
 export function EmployeeFacesPage() {
   const { employeeId } = useParams();
   const navigate = useNavigate();
@@ -13,6 +15,7 @@ export function EmployeeFacesPage() {
   const [faceSamples, setFaceSamples] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState("info");
   const [files, setFiles] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -32,12 +35,14 @@ export function EmployeeFacesPage() {
         return;
       }
       if (error.status === 404) {
-        setMessage("Employee not found");
+        setMessage("Không tìm thấy nhân viên.");
+        setMessageType("error");
         setEmployee(null);
         setFaceSamples([]);
         return;
       }
-      setMessage(error.message || "Failed to load face samples");
+      setMessage(error.message || "Không thể tải dữ liệu khuôn mặt.");
+      setMessageType("error");
     } finally {
       setLoading(false);
     }
@@ -53,7 +58,8 @@ export function EmployeeFacesPage() {
     setMessage("");
 
     if (files.length !== 5) {
-      setMessage("Please select exactly 5 images.");
+      setMessage("Vui lòng chọn chính xác 5 hình ảnh.");
+      setMessageType("error");
       return;
     }
 
@@ -63,14 +69,16 @@ export function EmployeeFacesPage() {
       await enrollFaceSamples(employeeId, files);
       setFiles([]);
       await loadFaceSamples();
-      setMessage("Face enrollment completed successfully");
+      setMessage("Đã đăng ký khuôn mặt thành công!");
+      setMessageType("success");
     } catch (error) {
       if (error.status === 401) {
         setUnauthenticated();
         navigate("/manager/login", { replace: true });
         return;
       }
-      setMessage(getFriendlyErrorMessage(error, "Could not enroll faces. Please try again."));
+      setMessage(getFriendlyErrorMessage(error, "Không thể đăng ký khuôn mặt. Vui lòng thử lại."));
+      setMessageType("error");
     } finally {
       setSubmitting(false);
     }
@@ -83,84 +91,151 @@ export function EmployeeFacesPage() {
     try {
       await deleteFaceSamples(employeeId);
       await loadFaceSamples();
-      setMessage("Face registration deleted successfully");
+      setMessage("Đã xóa đăng ký khuôn mặt thành công.");
+      setMessageType("success");
     } catch (error) {
       if (error.status === 401) {
         setUnauthenticated();
         navigate("/manager/login", { replace: true });
         return;
       }
-      setMessage(getFriendlyErrorMessage(error, "Could not delete face registration. Please try again."));
+      setMessage(getFriendlyErrorMessage(error, "Không thể xóa đăng ký khuôn mặt. Vui lòng thử lại."));
+      setMessageType("error");
     } finally {
       setDeleting(false);
     }
   }
 
   const sampleCount = faceSamples.length;
+  const emptySlots = Math.max(0, TOTAL_SLOTS - sampleCount);
 
   return (
-    <div className="stack">
-      <div className="compact">
-        <p className="eyebrow">Face registration</p>
-        <h2>Employee face management</h2>
-        <p className="note">
-          {employee ? `${employee.employee_code} - ${employee.full_name}` : "Loading employee..."}
-        </p>
-      </div>
-
-      <div className="split">
-        <section className="compact">
-          <h3>Current face samples</h3>
-          {loading ? (
-            <div className="muted-box">Loading face samples...</div>
-          ) : sampleCount === 0 ? (
-            <div className="muted-box">No face samples registered.</div>
-          ) : (
-            <div className="preview-list">
-              {faceSamples.map((sample) => (
-                <div className="preview-item" key={sample.id}>
-                  <strong>Sample {sample.sample_index}</strong>
-                  <span className="note">{sample.image_path}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="action-row">
-            <button className="btn btn-danger" type="button" onClick={handleDelete} disabled={deleting || loading}>
-              {deleting ? "Deleting..." : "Delete face registration"}
-            </button>
-            <Link className="btn btn-ghost" to="/manager/employees">
-              Back to roster
+    <div className="stack-lg page-transition">
+      {/* Header */}
+      <div className="page-header">
+        <div className="page-header-info">
+          <div className="row" style={{ gap: "var(--sp-2)" }}>
+            <Link to="/manager/employees" className="btn btn-ghost btn-sm" style={{ marginLeft: -8 }}>
+              ← Quay lại
             </Link>
           </div>
-        </section>
+          <h1>Đăng ký khuôn mặt</h1>
+          <p>
+            {employee ? `${employee.employee_code} — ${employee.full_name}` : "Đang tải..."}
+          </p>
+        </div>
+        <div className="row" style={{ gap: "var(--sp-2)" }}>
+          <span className={`badge ${sampleCount === TOTAL_SLOTS ? "badge-success" : "badge-warning"}`}>
+            {sampleCount}/{TOTAL_SLOTS} mẫu
+          </span>
+        </div>
+      </div>
 
-        <section className="compact">
-          <h3>Enroll 5 face images</h3>
-          <form className="field-grid" onSubmit={handleEnroll}>
-            <label className="field">
-              <span>Face images</span>
+      {/* Alert */}
+      {message && (
+        <div className={`alert alert-${messageType}`} role={messageType === "error" ? "alert" : undefined}>
+          {message}
+        </div>
+      )}
+
+      {/* Grid: Face slots left, Upload form right */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "var(--sp-6)", alignItems: "start" }}>
+
+        {/* Face Sample Grid */}
+        <div className="card">
+          <h3 style={{ marginBottom: "var(--sp-4)" }}>Mẫu khuôn mặt hiện tại</h3>
+
+          {loading ? (
+            <div className="loading-row">
+              <div className="spinner" />
+              Đang tải dữ liệu...
+            </div>
+          ) : (
+            <>
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${TOTAL_SLOTS}, 1fr)`,
+                gap: "var(--sp-3)"
+              }}>
+                {faceSamples.map((sample) => (
+                  <div key={sample.id} style={{
+                    aspectRatio: "1",
+                    borderRadius: "var(--radius-sm)",
+                    background: "var(--success-bg)",
+                    border: "2px solid var(--success)",
+                    display: "grid",
+                    placeItems: "center",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    color: "var(--success)",
+                  }}>
+                    ✓ #{sample.sample_index}
+                  </div>
+                ))}
+                {Array.from({ length: emptySlots }).map((_, i) => (
+                  <div key={`empty-${i}`} style={{
+                    aspectRatio: "1",
+                    borderRadius: "var(--radius-sm)",
+                    border: "2px dashed var(--border)",
+                    display: "grid",
+                    placeItems: "center",
+                    fontSize: "12px",
+                    color: "var(--text-hint)",
+                  }}>
+                    Trống
+                  </div>
+                ))}
+              </div>
+
+              {sampleCount > 0 && (
+                <div style={{ marginTop: "var(--sp-4)" }}>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={deleting || loading}
+                  >
+                    {deleting ? "Đang xóa..." : "Xóa toàn bộ đăng ký"}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Upload Form */}
+        <div className="card stack">
+          <h3>Tải lên 5 ảnh khuôn mặt</h3>
+          <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
+            Chọn đúng 5 hình ảnh rõ mặt, từ nhiều góc độ khác nhau để tăng độ chính xác nhận diện.
+          </p>
+          <form className="field-group" onSubmit={handleEnroll}>
+            <div className="field">
+              <label htmlFor="face-files">Hình ảnh khuôn mặt</label>
               <input
+                id="face-files"
                 type="file"
                 accept="image/*"
                 multiple
-                onChange={(event) => setFiles(Array.from(event.target.files || []))}
+                onChange={(e) => setFiles(Array.from(e.target.files || []))}
+                style={{ padding: "8px" }}
               />
-            </label>
-            <p className="note">Select exactly 5 images before submitting.</p>
+            </div>
+            {files.length > 0 && files.length !== 5 && (
+              <p style={{ fontSize: "12px", color: "var(--warning)" }}>
+                Đã chọn {files.length} ảnh. Cần đúng 5 ảnh.
+              </p>
+            )}
             <button className="btn btn-primary" type="submit" disabled={submitting}>
-              {submitting ? "Enrolling..." : "Enroll faces"}
+              {submitting ? (
+                <><div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Đang đăng ký...</>
+              ) : (
+                "Đăng ký khuôn mặt"
+              )}
             </button>
           </form>
-        </section>
+        </div>
       </div>
-
-      {message && (
-        <p className={message.includes("successfully") ? "status" : "status error"} role={message.includes("successfully") ? undefined : "alert"}>
-          {message}
-        </p>
-      )}
     </div>
   );
 }

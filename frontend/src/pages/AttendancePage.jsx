@@ -17,18 +17,18 @@ function formatCheckedInAt(value) {
   if (Number.isNaN(date.getTime())) {
     return value;
   }
-  return `${pad(date.getHours())}:${pad(date.getMinutes())} ${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+  return `${pad(date.getHours())}:${pad(date.getMinutes())} — ${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
 }
 
 function normalizeError(error) {
   const status = error?.payload?.status || error?.status;
   if (status === "unauthorized") {
-    return "Ban can dang nhap lai.";
+    return "Bạn cần đăng nhập lại.";
   }
   if (status === "invalid_request" && error?.payload?.message) {
     return error.payload.message;
   }
-  return error?.payload?.message || error?.message || "Khong the tai du lieu cham cong.";
+  return error?.payload?.message || error?.message || "Không thể tải dữ liệu chấm công.";
 }
 
 export default function AttendancePage() {
@@ -36,16 +36,8 @@ export default function AttendancePage() {
   const location = useLocation();
   const { setUnauthenticated } = useManagerAuth();
   const today = useMemo(() => getLocalDateValue(), []);
-  const [filters, setFilters] = useState({
-    from: today,
-    to: today,
-    search: "",
-  });
-  const [form, setForm] = useState({
-    from: today,
-    to: today,
-    search: "",
-  });
+  const [filters, setFilters] = useState({ from: today, to: today, search: "" });
+  const [form, setForm] = useState({ from: today, to: today, search: "" });
   const [records, setRecords] = useState([]);
   const [summary, setSummary] = useState({ total_records: 0 });
   const [loading, setLoading] = useState(true);
@@ -59,9 +51,7 @@ export default function AttendancePage() {
       setError("");
       try {
         const payload = await listAttendance(filters);
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
         setRecords(payload.records || []);
         setSummary(payload.summary || { total_records: 0 });
       } catch (caughtError) {
@@ -77,17 +67,12 @@ export default function AttendancePage() {
           setSummary({ total_records: 0 });
         }
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     }
 
     load();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [filters]);
 
   function handleSubmit(event) {
@@ -107,77 +92,88 @@ export default function AttendancePage() {
   }
 
   return (
-    <section className="attendance-page">
-      <header className="attendance-hero">
-        <div>
-          <p className="section-eyebrow">Manager Attendance</p>
+    <div className="stack-lg page-transition">
+      {/* Header */}
+      <div className="page-header">
+        <div className="page-header-info">
           <h1>Nhật ký chấm công</h1>
-          <p className="attendance-summary-copy">
-            Xem lịch sử chấm công theo ngày, tìm theo mã nhân viên hoặc tên, và mở ảnh check-in ngay trong browser.
-          </p>
+          <p>Xem lịch sử điểm danh theo ngày, tìm theo mã nhân viên hoặc tên.</p>
         </div>
-
-        <div className="attendance-summary-card" aria-label="Tong so ban ghi">
-          <span className="attendance-summary-label">Tong ban ghi</span>
+        <div className="attendance-summary-card" aria-label="Tổng số bản ghi">
+          <span className="attendance-summary-label">Tổng bản ghi</span>
           <strong>{summary.total_records || 0}</strong>
         </div>
-      </header>
+      </div>
 
+      {/* Filters */}
       <form className="attendance-filters" onSubmit={handleSubmit}>
-        <label>
-          Tu ngay
+        <div className="field">
+          <label htmlFor="att-from">Từ ngày</label>
           <input
+            id="att-from"
             type="date"
             value={form.from}
-            onChange={(event) => setForm((current) => ({ ...current, from: event.target.value }))}
+            onChange={(e) => setForm((c) => ({ ...c, from: e.target.value }))}
           />
-        </label>
-        <label>
-          Den ngay
+        </div>
+        <div className="field">
+          <label htmlFor="att-to">Đến ngày</label>
           <input
+            id="att-to"
             type="date"
             value={form.to}
-            onChange={(event) => setForm((current) => ({ ...current, to: event.target.value }))}
+            onChange={(e) => setForm((c) => ({ ...c, to: e.target.value }))}
           />
-        </label>
-        <label className="attendance-search">
-          Tim nhan vien
+        </div>
+        <div className="field" style={{ flex: 1.5 }}>
+          <label htmlFor="att-search">Tìm nhân viên</label>
           <input
+            id="att-search"
             type="text"
-            placeholder="Ma nhan vien hoac ten"
+            placeholder="Mã NV hoặc họ tên"
             value={form.search}
-            onChange={(event) => setForm((current) => ({ ...current, search: event.target.value }))}
+            onChange={(e) => setForm((c) => ({ ...c, search: e.target.value }))}
           />
-        </label>
+        </div>
         <div className="attendance-actions">
-          <button type="submit" disabled={loading}>
-            Ap dung
+          <button className="btn btn-primary" type="submit" disabled={loading}>
+            Áp dụng
           </button>
-          <button type="button" className="secondary" onClick={handleReset} disabled={loading}>
-            Tro ve hom nay
+          <button className="btn btn-secondary" type="button" onClick={handleReset} disabled={loading}>
+            Hôm nay
           </button>
         </div>
       </form>
 
-      {error ? <div role="alert" className="attendance-error">{error}</div> : null}
-      {loading ? <p className="attendance-state">Dang tai du lieu cham cong...</p> : null}
+      {/* Error */}
+      {error ? <div className="alert alert-error" role="alert">{error}</div> : null}
 
-      {!loading && records.length === 0 ? (
-        <div className="attendance-empty-state">
-          <h2>Khong co ban ghi</h2>
-          <p>Hay thu doi bo loc ngay hoac tim kiem khac.</p>
+      {/* Loading */}
+      {loading ? (
+        <div className="loading-row">
+          <div className="spinner" />
+          Đang tải dữ liệu chấm công...
         </div>
       ) : null}
 
+      {/* Empty state */}
+      {!loading && records.length === 0 ? (
+        <div className="empty-state">
+          <h3>Không có bản ghi</h3>
+          <p>Hãy thử đổi bộ lọc ngày hoặc tìm kiếm khác.</p>
+        </div>
+      ) : null}
+
+      {/* Table */}
       {!loading && records.length > 0 ? (
         <div className="attendance-table-wrap">
-          <table className="attendance-table">
+          <table className="data-table">
             <thead>
               <tr>
-                <th>Anh</th>
-                <th>Ma NV</th>
-                <th>Ho ten</th>
-                <th>Thoi gian check-in</th>
+                <th>Ảnh</th>
+                <th>Mã NV</th>
+                <th>Họ tên</th>
+                <th>Thời gian check-in</th>
               </tr>
             </thead>
             <tbody>
@@ -187,13 +183,13 @@ export default function AttendancePage() {
                     <a href={record.snapshot_url} target="_blank" rel="noreferrer" className="attendance-snapshot-link">
                       <img
                         src={record.snapshot_url}
-                        alt={`Anh check-in cua ${record.full_name}`}
+                        alt={`Ảnh check-in của ${record.full_name}`}
                         className="attendance-thumb"
                       />
-                      <span>Xem anh</span>
+                      Xem ảnh
                     </a>
                   </td>
-                  <td>{record.employee_code}</td>
+                  <td><strong>{record.employee_code}</strong></td>
                   <td>{record.full_name}</td>
                   <td>{formatCheckedInAt(record.checked_in_at)}</td>
                 </tr>
@@ -202,6 +198,6 @@ export default function AttendancePage() {
           </table>
         </div>
       ) : null}
-    </section>
+    </div>
   );
 }

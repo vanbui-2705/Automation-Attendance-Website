@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useGuestCamera } from '../hooks/useGuestCamera'
 import { captureGuestFrame, submitGuestCheckin } from '../lib/guestApi'
 import {
@@ -11,14 +12,31 @@ import './GuestCheckinPage.css'
 const SCAN_INTERVAL_MS = 2000
 const SUCCESS_COOLDOWN_SECONDS = 5
 
+function getStatusTone(result) {
+  if (!result) return 'idle'
+  if (result.status === 'recognized' || result.status === 'already_checked_in') return 'success'
+  if (result.status === 'multiple_faces') return 'warning'
+  if (result.status === 'unknown' || result.status === 'network_error') return 'error'
+  return 'scanning'
+}
+
+function getStatusIcon(tone) {
+  if (tone === 'success') return '✅'
+  if (tone === 'warning') return '⚠️'
+  if (tone === 'error') return '❌'
+  if (tone === 'scanning') return '🔍'
+  return '📷'
+}
+
 function GuestCheckinPage() {
   const { videoRef, cameraState, cameraError, retryCamera, stopCamera } = useGuestCamera()
   const [scanMode, setScanMode] = useState('idle')
   const [submissionState, setSubmissionState] = useState('idle')
   const [result, setResult] = useState(null)
-  const [statusText, setStatusText] = useState('San sang quet khuon mat.')
+  const [statusText, setStatusText] = useState('Sẵn sàng quét khuôn mặt.')
   const [cooldownSeconds, setCooldownSeconds] = useState(0)
   const [manualFile, setManualFile] = useState(null)
+  const [showFallback, setShowFallback] = useState(false)
   const inFlightRef = useRef(false)
 
   const isScanning = scanMode === 'scanning' && cooldownSeconds === 0
@@ -31,20 +49,19 @@ function GuestCheckinPage() {
     return getGuestResultCopy(result)
   }, [result])
 
+  // Auto-scan interval
   useEffect(() => {
     if (!isScanning) return undefined
-
     const intervalId = window.setInterval(() => {
       if (inFlightRef.current) return
       void runAutoScan()
     }, SCAN_INTERVAL_MS)
-
     return () => window.clearInterval(intervalId)
   }, [isScanning])
 
+  // Cooldown countdown
   useEffect(() => {
     if (cooldownSeconds <= 0) return undefined
-
     const intervalId = window.setInterval(() => {
       setCooldownSeconds((current) => {
         if (current <= 1) {
@@ -54,58 +71,46 @@ function GuestCheckinPage() {
         return current - 1
       })
     }, 1000)
-
     return () => window.clearInterval(intervalId)
   }, [cooldownSeconds])
 
+  // Cleanup camera on unmount
   useEffect(() => {
-    return () => {
-      stopCamera()
-    }
+    return () => { stopCamera() }
   }, [stopCamera])
 
+  // Status text sync
   useEffect(() => {
     if (cooldownSeconds > 0) {
-      setStatusText(`Tam dung quet, san sang quay lai sau ${cooldownSeconds} giay.`)
+      setStatusText(`Tạm dừng quét, sẵn sàng quay lại sau ${cooldownSeconds} giây.`)
       return
     }
-
     if (cameraUnavailable) {
-      setStatusText(cameraError || 'Camera khong kha dung. Ban co the tai anh len thay the.')
+      setStatusText(cameraError || 'Camera không khả dụng. Bạn có thể tải ảnh lên thay thế.')
       return
     }
-
-    if (
-      scanMode === 'scanning' &&
-      result &&
-      ['no_face', 'multiple_faces', 'network_error', 'unknown'].includes(result.status)
-    ) {
+    if (scanMode === 'scanning' && result && ['no_face', 'multiple_faces', 'network_error', 'unknown'].includes(result.status)) {
       setStatusText(getGuestResultCopy(result).message)
       return
     }
-
     if (scanMode === 'scanning') {
-      setStatusText('Dang quet tu dong...')
+      setStatusText('Đang quét tự động...')
       return
     }
-
     if (cameraState === 'ready') {
-      setStatusText('Camera san sang. Bam "Bat dau quet" de bat dau.')
+      setStatusText('Camera sẵn sàng. Bấm "Bắt đầu quét" để bắt đầu.')
       return
     }
-
     if (cameraState === 'requesting') {
-      setStatusText('Dang yeu cau quyen camera...')
+      setStatusText('Đang yêu cầu quyền camera...')
       return
     }
-
     if (cameraState === 'error' && cameraError) {
       setStatusText(cameraError)
       return
     }
-
     if (cameraState === 'idle') {
-      setStatusText('Dang khoi dong camera...')
+      setStatusText('Đang khởi động camera...')
     }
   }, [cameraState, cameraError, cameraUnavailable, cooldownSeconds, result, scanMode])
 
@@ -113,7 +118,6 @@ function GuestCheckinPage() {
     if (cameraState !== 'ready' || !isScanning || inFlightRef.current) return
     inFlightRef.current = true
     setSubmissionState('loading')
-
     try {
       const frame = await captureGuestFrame(videoRef.current)
       if (!frame) {
@@ -121,15 +125,11 @@ function GuestCheckinPage() {
         setStatusText(getGuestStatusMessage('no_face'))
         return
       }
-
       const payload = await submitGuestCheckin(frame)
       handleGuestResult(payload)
     } catch (error) {
       const friendly = getFriendlyBackendErrorMessage(error)
-      setResult({
-        message: friendly,
-        status: 'network_error',
-      })
+      setResult({ message: friendly, status: 'network_error' })
       setStatusText(friendly)
     } finally {
       inFlightRef.current = false
@@ -141,28 +141,19 @@ function GuestCheckinPage() {
     setResult(payload)
     const copy = getGuestResultCopy(payload)
     setStatusText(copy.message)
-
     if (payload?.status === 'recognized' || payload?.status === 'already_checked_in') {
       setScanMode('paused')
       setCooldownSeconds(SUCCESS_COOLDOWN_SECONDS)
       return
     }
-
-    if (payload?.status === 'unknown') {
-      setScanMode('scanning')
-      return
-    }
-
-    if (payload?.status === 'no_face' || payload?.status === 'multiple_faces') {
+    if (payload?.status === 'unknown' || payload?.status === 'no_face' || payload?.status === 'multiple_faces') {
       setScanMode('scanning')
     }
   }
 
   async function handleStartScanning() {
     if (isBusy || cameraState !== 'ready') return
-    if (cooldownSeconds > 0) {
-      setCooldownSeconds(0)
-    }
+    if (cooldownSeconds > 0) setCooldownSeconds(0)
     setScanMode('scanning')
   }
 
@@ -172,17 +163,14 @@ function GuestCheckinPage() {
 
   async function handleManualSubmit(event) {
     event.preventDefault()
-
     if (!manualFile) {
-      setStatusText('Hay chon mot anh truoc khi gui.')
+      setStatusText('Hãy chọn một ảnh trước khi gửi.')
       return
     }
-
     if (manualSubmissionBlocked || inFlightRef.current) {
-      setStatusText('Hay doi he thong xu ly xong roi thu lai.')
+      setStatusText('Hãy đợi hệ thống xử lý xong rồi thử lại.')
       return
     }
-
     setSubmissionState('loading')
     try {
       const payload = await submitGuestCheckin(manualFile)
@@ -190,10 +178,7 @@ function GuestCheckinPage() {
     } catch (error) {
       const friendly = getFriendlyBackendErrorMessage(error)
       setStatusText(friendly)
-      setResult({
-        message: friendly,
-        status: 'network_error',
-      })
+      setResult({ message: friendly, status: 'network_error' })
     } finally {
       setSubmissionState('idle')
     }
@@ -204,136 +189,132 @@ function GuestCheckinPage() {
     setManualFile(file)
   }
 
-  const latestResultLabel = resultCopy ? resultCopy.label : 'Chua co ket qua'
-  const latestResultTone = resultCopy ? resultCopy.tone : 'neutral'
+  const tone = getStatusTone(result)
+  const icon = getStatusIcon(tone)
+  const cardClass = isScanning && !result ? 'status-scanning' : `status-${tone}`
 
   return (
-    <main className="guest-checkin-page">
-      <section className="guest-hero">
-        <div>
-          <p className="guest-eyebrow">Guest check-in</p>
-          <h1>Quet khuon mat ngay tren trinh duyet</h1>
-          <p className="guest-subtitle">
-            Camera browser se lay khung hinh tu dong va gui tung anh mot cho backend
-            nhan dien. Khi nhan dien thanh cong, he thong se tam dung mot khoang ngan
-            truoc khi san sang quet lai.
-          </p>
+    <main className="guest-page">
+      <div className="guest-container">
+        {/* Top bar */}
+        <div className="guest-topbar">
+          <h1>Điểm danh khuôn mặt</h1>
+          <Link to="/" className="guest-topbar-back">← Về trang chủ</Link>
         </div>
 
-        <div className={`guest-status-card guest-status-${latestResultTone}`}>
-          <p className="guest-status-label">{latestResultLabel}</p>
-          <p className="guest-status-text">{statusText}</p>
-        </div>
-      </section>
+        {/* Split: Camera | Info */}
+        <div className="guest-split">
+          {/* Left: Camera */}
+          <div className="guest-camera-card">
+            <div className={`guest-video-wrapper${isScanning ? ' scanning' : ''}`}>
+              <video ref={videoRef} className="guest-video" autoPlay playsInline muted />
 
-      <section className="guest-grid">
-        <article className="guest-panel guest-camera-panel">
-          <div className="guest-video-shell">
-            <video
-              ref={videoRef}
-              className="guest-video"
-              autoPlay
-              playsInline
-              muted
-            />
+              {/* Reticle corners */}
+              {cameraState === 'ready' && (
+                <div className="guest-reticle"><span /></div>
+              )}
 
-            {cameraState !== 'ready' ? (
-              <div className="guest-video-overlay">
-                <p>{statusText}</p>
-                {cameraUnavailable ? (
-                  <button type="button" className="ghost-button" onClick={retryCamera}>
-                    Thu camera lai
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="guest-control-row">
-            <button
-              type="button"
-              className="primary-button"
-              onClick={handleStartScanning}
-              disabled={cameraState !== 'ready' || isBusy || isScanning}
-            >
-              Bat dau quet
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={handleStopScanning}
-              disabled={!isScanning}
-            >
-              Tam dung
-            </button>
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => void handleStartScanning()}
-              disabled={cameraState !== 'ready' || isBusy || isScanning}
-            >
-              Quet lai
-            </button>
-          </div>
-
-          <p className="guest-microcopy">
-            Trang nay chi gui mot khung hinh moi lan, tranh spam backend va tranh
-            diem danh trung lap.
-          </p>
-        </article>
-
-        <aside className="guest-panel guest-result-panel">
-          <div className="guest-result-stack">
-            <div>
-              <h2>Ket qua gan nhat</h2>
-              {resultCopy ? (
-                <div className="guest-result-detail">
-                  <p><strong>Trang thai:</strong> {resultCopy.label}</p>
-                  <p>{resultCopy.message}</p>
-                  {resultCopy.meta ? <p>{resultCopy.meta}</p> : null}
+              {/* Overlay when camera not ready */}
+              {cameraState !== 'ready' ? (
+                <div className="guest-video-overlay">
+                  <p>{statusText}</p>
+                  {cameraUnavailable ? (
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={retryCamera}>
+                      Thử lại camera
+                    </button>
+                  ) : null}
                 </div>
-              ) : (
-                <p>He thong se hien thi ket qua o day sau khi quet.</p>
+              ) : null}
+            </div>
+
+            {/* Controls */}
+            <div className="guest-camera-controls">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleStartScanning}
+                disabled={cameraState !== 'ready' || isBusy || isScanning}
+              >
+                {isScanning ? 'Đang quét...' : 'Bắt đầu quét'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleStopScanning}
+                disabled={!isScanning}
+              >
+                Tạm dừng
+              </button>
+              {isBusy && <div className="spinner" />}
+            </div>
+          </div>
+
+          {/* Right: Status + Fallback */}
+          <div className="guest-info-panel">
+            {/* Status Card */}
+            <div className={`guest-status-card ${cardClass}`}>
+              <div className="guest-status-icon">{icon}</div>
+              <div className="guest-status-label">
+                {resultCopy ? resultCopy.label : 'Chưa có kết quả'}
+              </div>
+
+              {/* Show employee name prominently on success */}
+              {result?.status === 'recognized' && result?.employee_name && (
+                <div className="guest-status-name">{result.employee_name}</div>
+              )}
+
+              <div className="guest-status-text">{statusText}</div>
+
+              {cooldownSeconds > 0 && (
+                <div className="guest-cooldown">
+                  Sẵn sàng quét lại sau {cooldownSeconds} giây
+                </div>
               )}
             </div>
 
-            <div className="guest-result-badges">
-              <span className="guest-badge">`recognized`</span>
-              <span className="guest-badge">`already_checked_in`</span>
-              <span className="guest-badge">`unknown`</span>
-              <span className="guest-badge">`no_face`</span>
-              <span className="guest-badge">`multiple_faces`</span>
-            </div>
-
-            {cooldownSeconds > 0 ? (
-              <p className="guest-cooldown">
-                San sang quet lai sau {cooldownSeconds} giay.
-              </p>
-            ) : null}
+            {/* Fallback upload (collapsed by default) */}
+            {!showFallback ? (
+              <button
+                type="button"
+                className="guest-fallback-toggle"
+                onClick={() => setShowFallback(true)}
+              >
+                📷 Không dùng được camera? Tải ảnh lên
+              </button>
+            ) : (
+              <form className="guest-fallback-form" onSubmit={handleManualSubmit}>
+                <h3>Tải ảnh kiểm tra</h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  Nếu camera bị từ chối quyền hoặc không có camera, hãy tải lên một ảnh khuôn mặt.
+                </p>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  aria-label="Tải ảnh check-in"
+                  style={{ padding: '8px' }}
+                />
+                <div className="row">
+                  <button
+                    type="submit"
+                    className="btn btn-primary btn-sm"
+                    disabled={!manualFile || manualSubmissionBlocked || inFlightRef.current}
+                  >
+                    Gửi ảnh
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setShowFallback(false)}
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
-
-          <form className="guest-fallback-form" onSubmit={handleManualSubmit}>
-            <h3>Fallback tai anh</h3>
-            <p>
-              Neu camera bi tu choi quyen hoac khong co camera, hay tai len mot anh
-              de gui di.
-            </p>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              aria-label="Tai anh check-in"
-            />
-            <button
-              type="submit"
-              className="secondary-button"
-              disabled={!manualFile || manualSubmissionBlocked || inFlightRef.current}
-            >
-              Gui anh
-            </button>
-          </form>
-        </aside>
-      </section>
+        </div>
+      </div>
     </main>
   )
 }

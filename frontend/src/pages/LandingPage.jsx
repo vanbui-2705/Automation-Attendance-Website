@@ -2,38 +2,65 @@ import { Link } from "react-router-dom";
 
 export function LandingPage() {
   return (
-    <main className="app-shell">
-      <div className="page-frame">
-        <section className="hero-panel page-transition">
-          <div className="hero-grid">
-            <div className="stack">
-              <p className="eyebrow">Local browser attendance</p>
-              <h1>Choose how you want to enter the system.</h1>
-              <p>
-                Manager gets the secure roster and face-registration flow. Guest will become the browser
-                camera check-in experience in the next step.
-              </p>
-              <div className="action-row">
-                <Link className="btn btn-primary" to="/manager/login">
-                  Manager
-                </Link>
-                <Link className="btn btn-secondary" to="/guest">
-                  Guest
-                </Link>
-              </div>
+    <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--bg-main)" }}>
+      <div className="page-transition" style={{ width: "100%", maxWidth: 560, padding: "var(--sp-6)", textAlign: "center" }}>
+        <div className="card-elevated" style={{ padding: "var(--sp-12) var(--sp-8)" }}>
+          <div className="stack" style={{ alignItems: "center" }}>
+            <div style={{
+              width: 56, height: 56,
+              borderRadius: "var(--radius-md)",
+              background: "var(--brand-light)",
+              display: "grid", placeItems: "center",
+              fontSize: 28,
+              marginBottom: "var(--sp-2)",
+            }}>
+              👤
             </div>
-            <div className="card-grid">
-              <div className="choice-card">
-                <strong>Manager</strong>
-                <p>Login, manage employees, and register face samples in batches of five.</p>
+
+            <h1 style={{ fontSize: "1.75rem" }}>Auto Attendance</h1>
+            <p style={{ color: "var(--text-secondary)", fontSize: "15px", maxWidth: "36ch", lineHeight: "var(--leading-relaxed)" }}>
+              Hệ thống điểm danh bằng khuôn mặt. Chọn cách bạn muốn truy cập.
+            </p>
+
+            <div className="stack-sm" style={{ marginTop: "var(--sp-4)", width: "100%" }}>
+              <Link className="btn btn-primary" to="/guest" style={{ width: "100%", padding: "12px 24px", fontSize: "15px" }}>
+                📷 Điểm danh (Guest)
+              </Link>
+              <Link className="btn btn-secondary" to="/manager/login" style={{ width: "100%", padding: "12px 24px", fontSize: "15px" }}>
+                🔐 Quản lý (Manager)
+              </Link>
+            </div>
+
+            <div style={{ marginTop: "var(--sp-6)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--sp-3)", width: "100%" }}>
+              <div style={{
+                padding: "var(--sp-4)",
+                background: "var(--bg-main)",
+                borderRadius: "var(--radius-sm)",
+                textAlign: "left",
+              }}>
+                <p style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>
+                  📷 Guest
+                </p>
+                <p style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: "var(--leading-relaxed)" }}>
+                  Quét khuôn mặt qua camera trình duyệt để điểm danh tự động.
+                </p>
               </div>
-              <div className="choice-card">
-                <strong>Guest</strong>
-                <p>A placeholder for the browser camera check-in flow that comes next.</p>
+              <div style={{
+                padding: "var(--sp-4)",
+                background: "var(--bg-main)",
+                borderRadius: "var(--radius-sm)",
+                textAlign: "left",
+              }}>
+                <p style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>
+                  🔐 Manager
+                </p>
+                <p style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: "var(--leading-relaxed)" }}>
+                  Đăng nhập, quản lý nhân viên, đăng ký khuôn mặt và xem lịch sử điểm danh.
+                </p>
               </div>
             </div>
           </div>
-        </section>
+        </div>
       </div>
     </main>
   );

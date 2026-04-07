@@ -68,6 +68,12 @@ export function loginManager(usernameOrCredentials, password) {
   })
 }
 
+export function logoutManager() {
+  return apiRequest('/api/manager/logout', {
+    method: 'POST',
+  })
+}
+
 export function fetchManagerMe() {
   return apiRequest('/api/manager/me')
 }

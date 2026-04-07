@@ -11,4 +11,4 @@ class Config:
     FACES_DIR = DATA_DIR / "faces"
     SECRET_KEY = os.getenv("SECRET_KEY") or secrets.token_hex(32)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    MAX_CONTENT_LENGTH = 3 * 1024 * 1024
+    MAX_CONTENT_LENGTH = 50 * 1024 * 1024

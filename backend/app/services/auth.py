@@ -39,6 +39,10 @@ def login_manager(manager):
     session[SESSION_MANAGER_USERNAME_KEY] = manager.username
 
 
+def logout_manager():
+    session.clear()
+
+
 def get_current_manager():
     manager_id = session.get(SESSION_MANAGER_ID_KEY)
     if manager_id is None:
