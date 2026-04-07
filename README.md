@@ -1,52 +1,207 @@
-## 1. Tổng Quan Dự Án
-- **Loại ứng dụng:** Desktop/Webcam App
-- **Trạng thái:** Đang phát triển (In Development)
-- **Ngôn ngữ lập trình chính:** Python (100%)
-- **Mục tiêu:** Xây dựng một hệ thống điểm danh tự động theo thời gian thực sử dụng camera, kết hợp các mô hình AI nhận diện khuôn mặt tiên tiến và lưu trữ dữ liệu đồng bộ lên đám mây.
+# Automatic Attendance Website
 
-## 2. Tech Stack
-- **Ngôn ngữ:** Python
-- **AI & Computer Vision:** 
-  - **YOLOv12-face:** Dùng để phát hiện khuôn mặt (Face Detection) và trích xuất các điểm đặc trưng (Keypoints).
-  - **ArcFace:** Dùng để trích xuất đặc trưng khuôn mặt (Face Recognition) thành vector 512 chiều.
-- **Cơ sở dữ liệu:** PostgreSQL kết hợp extension `pgvector` để lưu trữ và tìm kiếm vector nhúng.
-- **Tích hợp bên thứ 3:** Google Sheets API (thông qua thư viện `gspread`) để báo cáo và đồng bộ dữ liệu điểm danh.
+Ung dung web diem danh bang khuon mat voi 2 luong su dung chinh:
 
-## 3. Các Tính Năng Cốt Lõi
-1. **Nhận diện thời gian thực:** Quét và nhận diện khuôn mặt liên tục từ luồng camera sử dụng cơ chế Đa luồng (Multi-threading).
-2. **Căn chỉnh khuôn mặt (Face Alignment):** Tự động xoay và chuẩn hóa khuôn mặt dựa trên tọa độ Keypoints từ YOLOv12 bằng phép biến đổi Affine để tăng độ chính xác khi nhận diện.
-3. **Trích xuất Embedding:** Chuyển đổi hình ảnh khuôn mặt thành vector toán học 512 chiều thông qua mô hình ArcFace.
-4. **Tìm kiếm Vector:** Sử dụng thuật toán đo khoảng cách Cosine trên PostgreSQL pgvector để so khớp khuôn mặt nhanh chóng.
-5. **Cơ chế chống lặp (Anti-spam):** Kết hợp bộ nhớ tạm (In-memory Cache) và đồng bộ file CSV để ngăn chặn việc ghi log liên tục cho cùng một người trong một ngày.
-6. **Đồng bộ đám mây:** Ghi nhận lịch sử điểm danh trực tiếp lên Google Sheets chạy hoàn toàn trên luồng nền (background thread).
+- Nhan vien/khach mo trang guest de quet khuon mat bang camera trinh duyet hoac tai anh len.
+- Quan ly dang nhap vao trang manager de tao nhan vien, dang ky mau khuon mat va xem nhat ky diem danh.
 
-## 4. Thiết Kế Cơ Sở Dữ Liệu
-Hệ thống sử dụng PostgreSQL tối ưu cho lưu trữ vector.
-- **Bảng `faces`**:
-  - `picture (text) (PK)`: Tên người (được sử dụng làm định danh duy nhất khi ghi log điểm danh).
-  - `embedding (vector)`: Lưu trữ vector 512 chiều của khuôn mặt sinh ra từ ArcFace.
+README nay da duoc cap nhat theo kien truc hien tai cua repo. Day khong con la ung dung desktop Python cu nua.
 
-## 5. Quy Tắc Nghiệp Vụ
-- **Ghi nhận điểm danh:** Khi hệ thống nhận diện thành công một người, thông tin về thời gian (giờ/ngày) sẽ được ghi ngay lập tức vào file CSV cục bộ và đẩy lên Google Sheets.
-- **Chống spam dữ liệu:** Nếu một người đã được điểm danh trong ngày, hệ thống sẽ tự động bỏ qua các lần nhận diện tiếp theo của người đó trong cùng ngày hôm đó để tránh rác dữ liệu.
+## Tinh nang hien tai
 
-## 6. Giải Pháp Kỹ Thuật & Tối Ưu Hiệu Năng
+- Guest check-in bang webcam trong trinh duyet, tu dong quet dinh ky va co fallback tai anh khi camera khong dung duoc.
+- Rate limit cho endpoint guest check-in: 10 request trong 60 giay theo IP.
+- Dang nhap manager bang session cookie cua Flask.
+- Tao va xem danh sach nhan vien.
+- Dang ky khuon mat cho nhan vien bang dung 5 anh mau.
+- Kiem tra loi no face / multiple faces ngay trong qua trinh dang ky.
+- Nhan dien khuon mat bang DeepFace voi model ArcFace.
+- So khop embedding bang cosine distance voi nguong mac dinh `0.6`.
+- Chi tao 1 ban ghi diem danh moi nhan vien trong moi ngay.
+- Luu snapshot check-in de manager mo lai tu trang attendance.
+- Loc lich su diem danh theo ngay va tim theo ma nhan vien / ho ten.
 
-### 6.1. Xử lý Đa luồng & Chống đơ giao diện
-- **Vấn đề:** Các tác vụ phân tích AI (ArcFace) và gọi API lên Google Sheets có độ trễ lớn (từ 1 đến 3 giây). Nếu chạy trên Main Thread, luồng camera sẽ bị đóng băng.
-- **Giải pháp:** Áp dụng kiến trúc **Drop-if-busy** để xử lý hình ảnh từ `VideoCapture`. Các tác vụ nặng bắt buộc được đẩy vào `RecognitionWorker` và quản lý bằng `ThreadPoolExecutor` để đảm bảo luồng UI (camera) luôn mượt mà.
+## Kien truc tong quan
 
-### 6.2. Tối ưu hóa truy vấn Database (Batch Query pgvector)
-- **Giải pháp giải quyết bài toán N+1:** Thay vì truy vấn so khớp từng khuôn mặt một, hệ thống gom nhóm (batching) sử dụng cấu trúc `VALUES (idx, vec)` kết hợp với `CROSS JOIN LATERAL` trong PostgreSQL. Điều này giúp lấy ra `top_k` kết quả đối sánh cho nhiều khuôn mặt trong một truy vấn duy nhất, giảm thiểu đáng kể độ trễ mạng.
+### Frontend
 
-### 6.3. Tối ưu hóa Face Alignment
-- Phép biến đổi cắt xoay (`warpAffine`) được tối ưu hóa để chạy nhẹ nhàng trên CPU. Hệ thống **chỉ xoay phần ảnh khuôn mặt đã được cắt (crop) và đệm (padding)**, tuyệt đối không áp dụng phép xoay lên toàn bộ khung hình lớn của camera để tiết kiệm tài nguyên tính toán.
+- React 18
+- Vite
+- React Router
+- Vitest + Testing Library
 
-### 6.4. Xử lý Lỗi & Khả năng phục hồi
-- **Kết nối Database:** Khi làm việc với Cloud Database (như Aiven PG), kết nối mạng thường có rủi ro bị đứt ngầm.
-- **Khắc phục:** Hệ thống được thiết kế để bắt chính xác lỗi `psycopg2.OperationalError` và thực hiện cơ chế **Auto-reconnect** (tự động kết nối lại) ở cấp độ thư viện. Điều này khắc phục tình trạng "mù vĩnh viễn" của ứng dụng so với việc chỉ dùng khối `except Exception` chung chung.
+### Backend
 
-## 7. Đánh giá thử nghiệm thực tế
+- Flask 3
+- Flask-SQLAlchemy
+- SQLite local (`backend/data/app.db`)
+- DeepFace / ArcFace
+- OpenCV + NumPy
 
-- Qua 20 lượt kiểm thử thực tế, hiệu suất của thuật toán có sự phân hóa rõ rệt dựa trên mức độ che khuất (occlusion) của khuôn mặt. Với các mẫu thử sạch (không kính, không tóc mái), thời gian phản hồi đạt mức lý tưởng từ 1-3s. Khi xuất hiện yếu tố che khuất tĩnh như kính mắt, hệ thống cần xử lý từ 5-6 frames trong khoảng 5-7s để hội tụ kết quả. Đặc biệt, trong điều kiện che khuất phức hợp (kính kết hợp tóc mái che khuất vùng lông mày/mắt), tỷ lệ nhận diện thành công giảm tiệm cận 0, tốn khoảng 30s chỉ để bắt được 1-2 lần khớp.
-- ***Kết luận:*** Hiện tượng nhiễu bề mặt do vật cản (kính, tóc, khẩu trang,...) đã làm suy giảm khả năng định vị các facial landmarks trọng yếu. Hậu quả là mô hình ArcFace không thể trích xuất được vector embedding toàn vẹn, làm giảm mạnh độ tương đồng cosine (cosine similarity) khi đối chiếu với các template khuôn mặt đã được đăng ký, trực tiếp gây ra tình trạng nhận diện chậm hoặc thất bại.
+### Luu tru local
+
+- Database: `backend/data/app.db`
+- Anh check-in: `backend/data/checkins/<YYYY-MM-DD>/...`
+- Anh mau khuon mat: `backend/data/faces/employee-<id>/...`
+
+## Luong nghiep vu
+
+1. Tao tai khoan manager.
+2. Dang nhap trang `/manager/login`.
+3. Tao nhan vien moi voi `employee_code` va `full_name`.
+4. Tai len dung 5 anh khuon mat cho tung nhan vien.
+5. Mo trang `/guest` de quet khuon mat bang camera hoac gui anh thu cong.
+6. He thong trich xuat embedding, so khop voi bo mau dang hoat dong va ghi nhan check-in neu hop le.
+7. Manager vao trang attendance de xem danh sach ban ghi va snapshot.
+
+## Cau truc thu muc
+
+```text
+.
+|-- backend/
+|   |-- app/
+|   |   |-- routes/
+|   |   |-- services/
+|   |   |-- models.py
+|   |   `-- config.py
+|   |-- tests/
+|   |-- Dockerfile
+|   `-- run.py
+|-- frontend/
+|   |-- src/
+|   |   |-- pages/
+|   |   |-- components/
+|   |   |-- context/
+|   |   `-- lib/
+|   |-- package.json
+|   `-- vite.config.js
+|-- scripts/
+|   `-- create_manager.py
+|-- docker-compose.yml
+|-- run-local.ps1
+`-- .env.example
+```
+
+## Bien moi truong
+
+Copy `.env.example` thanh `.env`:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Noi dung hien tai:
+
+```env
+SECRET_KEY=change-me-to-a-random-string
+```
+
+`SECRET_KEY` nen duoc dat co dinh trong moi truong dev/production de session manager khong bi mat sau moi lan restart.
+
+## Chay bang Docker Compose
+
+Day la cach chay khop nhat voi cau hinh hien tai cua du an.
+
+### Yeu cau
+
+- Docker Desktop
+- Docker Compose
+
+### Khoi dong
+
+```powershell
+Copy-Item .env.example .env
+docker compose up --build
+```
+
+Sau khi chay:
+
+- Frontend: `http://localhost:5173`
+- Guest check-in: `http://localhost:5173/guest`
+- Manager login: `http://localhost:5173/manager/login`
+- Backend health: `http://localhost:5000/api/health`
+
+Lan chay dau co the cham hon do container can cai dependency va tai model/cache phuc vu nhan dien.
+
+### Tao tai khoan manager
+
+Trong mot terminal khac:
+
+```powershell
+docker compose exec backend python scripts/create_manager.py --username admin --password abc123
+```
+
+Neu tai khoan da ton tai, script se in ra `exists:<username>`.
+
+## Chay local khong dung Docker
+
+Phu hop khi ban muon debug rieng tung service. Can luu y rang `frontend/vite.config.js` hien dang proxy `/api` sang `http://backend:5000`, tuong thich tot voi Docker network. Neu chay frontend truc tiep tren may, hay dam bao target proxy tro dung toi backend host ban dang dung.
+
+### Backend
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r backend/requirements.txt
+Copy-Item .env.example .env
+python backend/run.py
+```
+
+### Frontend
+
+```powershell
+Set-Location frontend
+npm install
+npm run dev
+```
+
+### Script ho tro tren Windows
+
+Repo co san `run-local.ps1` de mo backend va frontend trong 2 cua so PowerShell rieng:
+
+```powershell
+.\run-local.ps1
+```
+
+## Kiem thu
+
+### Backend
+
+```powershell
+python -m pytest backend/tests -v
+```
+
+### Frontend
+
+```powershell
+Set-Location frontend
+npm test
+```
+
+## API va hanh vi quan trong
+
+- `POST /api/guest/checkin`
+  - Nhan file `frame`
+  - Tra ve cac trang thai nhu `recognized`, `already_checked_in`, `unknown`, `no_face`, `multiple_faces`, `rate_limited`
+- `POST /api/manager/login`
+  - Dang nhap manager
+- `GET /api/manager/employees`
+  - Lay danh sach nhan vien
+- `POST /api/manager/employees`
+  - Tao nhan vien moi
+- `GET /api/manager/employees/<id>/face-samples`
+  - Lay danh sach mau khuon mat da dang ky
+- `POST /api/manager/employees/<id>/face-enrollment`
+  - Dang ky dung 5 anh khuon mat
+- `DELETE /api/manager/employees/<id>/face-samples`
+  - Xoa toan bo bo mau da dang ky
+- `GET /api/manager/attendance`
+  - Xem lich su diem danh theo bo loc ngay / tim kiem
+
+## Gioi han hien tai
+
+- Moi nhan vien hien chi co luong tao/xem va dang ky/xoa bo mau khuon mat; chua co sua/xoa nhan vien tren giao dien.
+- Face index duoc refresh tu du lieu luu tru trong qua trinh so khop.
+- Du an hien uu tien luu tru local bang SQLite va file he thong, chua co dong bo cloud/database ngoai.
+- Frontend local dev can de y cau hinh proxy `/api` neu khong chay qua Docker.
+
