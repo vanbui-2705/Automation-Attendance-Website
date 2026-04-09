@@ -55,43 +55,84 @@ def test_guest_checkin_returns_payload_from_recognition_service(app, client):
     ]
 
 
-def test_embedding_service_uses_deepface_arcface_wrapper(monkeypatch, tmp_path):
-    captured = {}
+def test_embedding_service_uses_yolo_and_deepface_arcface(monkeypatch, tmp_path):
+    """Verify the YOLO → align_face → DeepFace(skip) pipeline.
 
-    class FakeDeepFace:
-        @staticmethod
-        def represent(img_path, model_name, enforce_detection):
-            captured["img_path_type"] = type(img_path).__name__
-            captured["model_name"] = model_name
-            captured["enforce_detection"] = enforce_detection
-            return [
-                {"embedding": [0.1, 0.2, 0.3]},
-                {"embedding": [0.4, 0.5, 0.6]},
-            ]
-
-    fake_module = types.ModuleType("deepface")
-    fake_module.DeepFace = FakeDeepFace
-    monkeypatch.setitem(sys.modules, "deepface", fake_module)
-
-    # Create a minimal valid JPEG so cv2.imdecode succeeds
+    We fake both the YOLO model output and DeepFace.represent so the test
+    runs instantly without real model weights or a real face image.
+    """
     import cv2
     import numpy as np
 
-    tiny_img = np.zeros((2, 2, 3), dtype=np.uint8)
-    _, jpeg_bytes = cv2.imencode(".jpg", tiny_img)
+    captured = {}
+
+    # -- Fake DeepFace that records how it was called --
+    class FakeDeepFace:
+        @staticmethod
+        def represent(img_path, model_name, enforce_detection, detector_backend, align):
+            captured["img_path_type"] = type(img_path).__name__
+            captured["model_name"] = model_name
+            captured["enforce_detection"] = enforce_detection
+            captured["detector_backend"] = detector_backend
+            captured["align"] = align
+            return [{"embedding": [0.1, 0.2, 0.3]}]
+
+    fake_deepface_module = types.ModuleType("deepface")
+    fake_deepface_module.DeepFace = FakeDeepFace
+    monkeypatch.setitem(sys.modules, "deepface", fake_deepface_module)
+
+    # -- Fake YOLO model that returns one detection with box + keypoints --
+    class FakeBoxes:
+        def __init__(self, img_h, img_w):
+            import torch
+            self.xyxy = torch.tensor([[5, 5, img_w - 5, img_h - 5]])
+
+        def __len__(self):
+            return 1
+
+    class FakeKeypoints:
+        def __init__(self, img_h, img_w):
+            import torch
+            # 5 keypoints: left_eye, right_eye, nose, left_mouth, right_mouth
+            self.xy = torch.tensor([[[15, 15], [img_w - 15, 15], [img_w // 2, img_h // 2],
+                                     [15, img_h - 10], [img_w - 15, img_h - 10]]], dtype=torch.float32)
+
+    class FakeDetectionResult:
+        def __init__(self, img_h, img_w):
+            self.boxes = FakeBoxes(img_h, img_w)
+            self.keypoints = FakeKeypoints(img_h, img_w)
+
+    class FakeYOLO:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def predict(self, img, conf=0.5, verbose=False):
+            h, w = img.shape[:2]
+            return [FakeDetectionResult(h, w)]
+
+    # Create a small valid image (50x50 so crop is non-empty)
+    test_img = np.random.randint(0, 255, (50, 50, 3), dtype=np.uint8)
+    _, jpeg_bytes = cv2.imencode(".jpg", test_img)
     frame_bytes = jpeg_bytes.tobytes()
 
     try:
-        from backend.app.services.embedding import EmbeddingService
+        from backend.app.services import embedding as embedding_mod
     except ModuleNotFoundError:
-        from app.services.embedding import EmbeddingService
+        from app.services import embedding as embedding_mod
 
-    embeddings = EmbeddingService().extract_embeddings(frame_bytes)
+    service = embedding_mod.EmbeddingService()
+    # Inject fake YOLO model directly (skip lazy-load)
+    service._yolo_model = FakeYOLO()
+    # Patch DeepFace on the already-imported module (top-level import is cached)
+    monkeypatch.setattr(embedding_mod, "DeepFace", FakeDeepFace)
 
-    assert embeddings == [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
+    embeddings = service.extract_embeddings(frame_bytes)
+
+    assert embeddings == [[0.1, 0.2, 0.3]]
     assert captured["img_path_type"] == "ndarray"
     assert captured["model_name"] == "ArcFace"
-    assert captured["enforce_detection"] is False
+    assert captured["detector_backend"] == "skip"
+    assert captured["align"] is False
 
 
 def test_storage_service_saves_guest_frame_under_dated_subdirectory(tmp_path, monkeypatch):

@@ -1,5 +1,6 @@
 .env
 .env.example
+.pytest_cache
 credentials.json
 /stored-faces
 /__pycache__
@@ -20,3 +21,4 @@ backend/data/
 
 .claude/
 .claudeignore
+*.pt
