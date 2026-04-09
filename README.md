@@ -1,28 +1,27 @@
 # Automatic Attendance Website
 
-Ung dung web cham cong bang khuon mat voi 2 luong su dung chinh:
+Ứng dụng web điểm danh bằng khuôn mặt với 2 luồng sử dụng chính:
 
-- Guest/nhan vien mo trang guest de quet khuon mat bang camera trinh duyet hoac tai anh len.
-- Manager dang nhap vao trang quan tri de quan ly nhan vien, quan ly bo 5 anh khuon mat va xem lich su cham cong.
+- Nhân viên/khách mở trang guest để quét khuôn mặt bằng camera trình duyệt hoặc tải ảnh lên.
+- Quản lý đăng nhập vào trang manager để tạo nhân viên, đăng ký mẫu khuôn mặt và xem nhật ký điểm danh.
 
-README nay da duoc cap nhat theo kien truc hien tai cua repo web.
+README này đã được cập nhật theo kiến trúc hiện tại của repo. Đây không còn là ứng dụng desktop Python cũ nữa.
 
-## Tinh nang hien tai
+## Tính năng hiện tại
 
-- Guest check-in bang webcam trong trinh duyet, co fallback upload anh.
-- Rate limit cho endpoint guest check-in: 10 request trong 60 giay theo IP.
-- Dang nhap manager bang session cookie Flask.
-- Tao, sua va xoa mem nhan vien.
-- Dang ky bo 5 anh khuon mat cho nhan vien.
-- Thay the rieng tung anh trong 5 slot khuon mat neu co anh bi nham.
-- Kiem tra loi `no_face` / `multiple_faces` trong qua trinh dang ky hoac thay anh.
-- Nhan dien khuon mat bang DeepFace voi model ArcFace.
-- So khop embedding bang cosine distance voi nguong mac dinh `0.6`.
-- Moi nhan vien chi co 1 ban ghi cham cong moi ngay.
-- Luu snapshot check-in de manager xem lai tu trang attendance.
-- Loc lich su diem danh theo ngay, ma nhan vien / ho ten, phong ban va chuc vu.
+- Guest check-in bằng webcam trong trình duyệt, tự động quét định kỳ và có fallback tải ảnh khi camera không dùng được.
+- Rate limit cho endpoint guest check-in: 10 request trong 60 giây theo IP.
+- Đăng nhập manager bằng session cookie của Flask.
+- Tạo và xem danh sách nhân viên.
+- Đăng ký khuôn mặt cho nhân viên bằng đúng 5 ảnh mẫu.
+- Kiểm tra lỗi no face / multiple faces ngay trong quá trình đăng ký.
+- Nhận diện khuôn mặt bằng DeepFace với model ArcFace.
+- So khớp embedding bằng cosine distance với ngưỡng mặc định `0.6`.
+- Chỉ tạo 1 bản ghi điểm danh mỗi nhân viên trong mỗi ngày.
+- Lưu snapshot check-in để manager mở lại từ trang attendance.
+- Lọc lịch sử điểm danh theo ngày và tìm theo mã nhân viên / họ tên.
 
-## Kien truc tong quan
+## Kiến trúc tổng quan
 
 ### Frontend
 
@@ -35,28 +34,27 @@ README nay da duoc cap nhat theo kien truc hien tai cua repo web.
 
 - Flask 3
 - Flask-SQLAlchemy
-- SQLite local: `backend/data/app.db`
+- SQLite local (`backend/data/app.db`)
 - DeepFace / ArcFace
 - OpenCV + NumPy
 
-### Luu tru local
+### Lưu trữ local
 
 - Database: `backend/data/app.db`
-- Anh check-in: `backend/data/checkins/<YYYY-MM-DD>/...`
-- Anh mau khuon mat: `backend/data/faces/employee-<id>/...`
+- Ảnh check-in: `backend/data/checkins/<YYYY-MM-DD>/...`
+- Ảnh mẫu khuôn mặt: `backend/data/faces/employee-<id>/...`
 
-## Luong nghiep vu
+## Luồng nghiệp vụ
 
-1. Tao tai khoan manager.
-2. Dang nhap `/manager/login`.
-3. Tao nhan vien moi voi `employee_code`, `full_name`, `department`, `position`.
-4. Tai len dung 5 anh khuon mat cho tung nhan vien.
-5. Neu 1 trong 5 anh bi sai, manager vao trang khuon mat va thay dung slot do.
-6. Guest mo `/guest` de quet khuon mat bang camera hoac gui anh.
-7. He thong trich xuat embedding, so khop voi bo mau dang hoat dong va ghi nhan check-in neu hop le.
-8. Manager vao trang attendance de xem danh sach ban ghi va snapshot.
+1. Tạo tài khoản manager.
+2. Đăng nhập trang `/manager/login`.
+3. Tạo nhân viên mới với `employee_code` và `full_name`.
+4. Tải lên đúng 5 ảnh khuôn mặt cho từng nhân viên.
+5. Mở trang `/guest` để quét khuôn mặt bằng camera hoặc gửi ảnh thủ công.
+6. Hệ thống trích xuất embedding, so khớp với bộ mẫu đang hoạt động và ghi nhận check-in nếu hợp lệ.
+7. Manager vào trang attendance để xem danh sách bản ghi và snapshot.
 
-## Cau truc thu muc
+## Cấu trúc thư mục
 
 ```text
 .
@@ -84,64 +82,60 @@ README nay da duoc cap nhat theo kien truc hien tai cua repo web.
 `-- .env.example
 ```
 
-## Bien moi truong
+## Biến môi trường
 
-Copy `.env.example` thanh `.env`:
+Copy `.env.example` thành `.env`:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Noi dung hien tai:
+Nội dung hiện tại:
 
 ```env
 SECRET_KEY=change-me-to-a-random-string
 ```
 
-`SECRET_KEY` nen duoc dat co dinh trong dev/production de session manager khong bi mat sau moi lan restart.
+`SECRET_KEY` nên được đặt cố định trong môi trường dev/production để session manager không bị mất sau mỗi lần restart.
 
-## Chay bang Docker Compose
+## Chạy bằng Docker Compose
 
-`docker-compose.yml` hien duoc cau hinh theo huong production-ready:
+Đây là cách chạy khớp nhất với cấu hình hiện tại của dự án.
 
-- Frontend build bang Vite va serve bang Nginx.
-- Nginx proxy `/api` sang backend de frontend va backend cung origin.
-- Backend chay bang Gunicorn thay vi Flask dev server.
-
-### Yeu cau
+### Yêu cầu
 
 - Docker Desktop
 - Docker Compose
 
-### Khoi dong
+### Khởi động
 
 ```powershell
 Copy-Item .env.example .env
 docker compose up --build
 ```
 
-Sau khi chay:
+Sau khi chạy:
 
-- Frontend: `http://localhost:8080`
-- Guest check-in: `http://localhost:8080/guest`
-- Manager login: `http://localhost:8080/manager/login`
+- Frontend: `http://localhost:5173`
+- Guest check-in: `http://localhost:5173/guest`
+- Manager login: `http://localhost:5173/manager/login`
 - Backend health: `http://localhost:5000/api/health`
 
-### Tao tai khoan manager
+Lần chạy đầu có thể chậm hơn do container cần cài dependency và tải model/cache phục vụ nhận diện.
 
-Trong mot terminal khac:
+### Tạo tài khoản manager
+
+Trong một terminal khác:
 
 ```powershell
 docker compose exec backend python scripts/create_manager.py --username admin --password abc123
 ```
 
-Neu tai khoan da ton tai, script se in ra `exists:<username>`.
+Nếu tài khoản đã tồn tại, script sẽ in ra `exists:<username>`.
 
-## Chay local khong dung Docker
+## Chạy local không dùng Docker
 
-Frontend local mac dinh proxy `/api` sang `http://127.0.0.1:5000`. Khi chay trong Docker Compose, bien moi truong se doi target sang `http://backend:5000`.
-
-Vite da duoc cau hinh `strictPort` cho cong `5173` de tranh mo nham frontend cu o cong khac.
+Phù hợp khi bạn muốn debug riêng từng service. Cần lưu ý rằng `frontend/vite.config.js` hiện đang proxy `/api` sang `http://backend:5000`, tương thích tốt với Docker network. Nếu chạy frontend trực tiếp trên máy, hãy đảm bảo target proxy trỏ đúng tới backend host bạn đang dùng.
 
 ### Backend
 
@@ -161,15 +155,15 @@ npm install
 npm run dev
 ```
 
-### Script ho tro tren Windows
+### Script hỗ trợ trên Windows
 
-Repo co san `run-local.ps1` de mo backend va frontend trong 2 cua so PowerShell rieng:
+Repo có sẵn `run-local.ps1` để mở backend và frontend trong 2 cửa sổ PowerShell riêng:
 
 ```powershell
 .\run-local.ps1
 ```
 
-## Kiem thu
+## Kiểm thử
 
 ### Backend
 
@@ -184,45 +178,30 @@ Set-Location frontend
 npm test
 ```
 
-## API va hanh vi quan trong
+## API và hành vi quan trọng
 
 - `POST /api/guest/checkin`
-  - Nhan file `frame`
-  - Tra ve cac trang thai nhu `recognized`, `already_checked_in`, `unknown`, `no_face`, `multiple_faces`, `rate_limited`
+  - Nhận file `frame`
+  - Trả về các trạng thái như `recognized`, `already_checked_in`, `unknown`, `no_face`, `multiple_faces`, `rate_limited`
 - `POST /api/manager/login`
-  - Dang nhap manager
-- `GET /api/manager/me`
-  - Lay manager hien tai tu session
+  - Đăng nhập manager
 - `GET /api/manager/employees`
-  - Lay danh sach nhan vien
+  - Lấy danh sách nhân viên
 - `POST /api/manager/employees`
-  - Tao nhan vien moi voi `employee_code`, `full_name`, `department`, `position`
-- `PUT /api/manager/employees/<id>`
-  - Cap nhat thong tin nhan vien, bao gom `department` va `position`
-- `DELETE /api/manager/employees/<id>`
-  - Xoa mem nhan vien: dat `is_active = false` va xoa bo khuon mat khoi recognition index
+  - Tạo nhân viên mới
 - `GET /api/manager/employees/<id>/face-samples`
-  - Lay danh sach mau khuon mat da dang ky
-- `GET /api/manager/employees/<id>/face-samples/<sample_index>/image`
-  - Tra ve file anh cua dung slot khuon mat de frontend preview
+  - Lấy danh sách mẫu khuôn mặt đã đăng ký
 - `POST /api/manager/employees/<id>/face-enrollment`
-  - Dang ky dung 5 anh khuon mat
-- `PUT /api/manager/employees/<id>/face-samples/<sample_index>`
-  - Thay the rieng 1 anh khuon mat trong 5 slot va refresh face index ngay sau khi luu
+  - Đăng ký đúng 5 ảnh khuôn mặt
 - `DELETE /api/manager/employees/<id>/face-samples`
-  - Xoa toan bo bo mau da dang ky
-- `GET /api/manager/dashboard`
-  - Lay tong quan KPI va thong ke nhan vien
+  - Xóa toàn bộ bộ mẫu đã đăng ký
 - `GET /api/manager/attendance`
-  - Xem lich su diem danh theo bo loc ngay / tim kiem / phong ban / chuc vu
+  - Xem lịch sử điểm danh theo bộ lọc ngày / tìm kiếm
 
-## Ghi chu hanh vi
+## Giới hạn hiện tại
 
-- Xoa nhan vien hien duoc trien khai theo kieu xoa mem de giu lich su cham cong.
-- Khi xoa mem nhan vien, bo khuon mat se bi xoa khoi recognition index de khong con nhan dien nham.
-- Trang quan ly khuon mat hien cho phep sua rieng tung slot de khong phai dang ky lai ca bo 5 anh.
+- Mỗi nhân viên hiện chỉ có luồng tạo/xem và đăng ký/xóa bộ mẫu khuôn mặt; chưa có sửa/xóa nhân viên trên giao diện.
+- Face index được refresh từ dữ liệu lưu trữ trong quá trình so khớp.
+- Dự án hiện ưu tiên lưu trữ local bằng SQLite và file hệ thống, chưa có đồng bộ cloud/database ngoài.
+- Frontend local dev cần để ý cấu hình proxy `/api` nếu không chạy qua Docker.
 
-## Gioi han hien tai
-
-- Du an hien uu tien luu tru local bang SQLite va file he thong, chua co dong bo cloud/database ngoai.
-- Frontend local dev can de y cau hinh proxy `/api` neu khong chay qua Docker.
