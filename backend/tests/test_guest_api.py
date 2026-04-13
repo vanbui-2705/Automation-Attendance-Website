@@ -57,7 +57,7 @@ def test_guest_checkin_returns_payload_from_recognition_service(app, client):
     ]
 
 
-def test_embedding_service_defers_deepface_import_until_extraction(monkeypatch):
+def test_embedding_service_defers_insightface_import_until_extraction(monkeypatch):
     module_name = "backend.app.services.embedding"
     if importlib.util.find_spec(module_name) is None:
         module_name = "app.services.embedding"
@@ -68,9 +68,9 @@ def test_embedding_service_defers_deepface_import_until_extraction(monkeypatch):
     original_import = __import__
 
     def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name == "deepface":
+        if name == "insightface" or name.startswith("insightface."):
             attempted_imports.append((name, tuple(fromlist or ())))
-            raise AssertionError("deepface should be imported lazily")
+            raise AssertionError("insightface should be imported lazily")
         return original_import(name, globals, locals, fromlist, level)
 
     monkeypatch.setattr("builtins.__import__", guarded_import)
@@ -80,10 +80,10 @@ def test_embedding_service_defers_deepface_import_until_extraction(monkeypatch):
     assert attempted_imports == []
 
 
-def test_embedding_service_uses_yolo_and_deepface_arcface(monkeypatch, tmp_path):
-    """Verify the YOLO → align_face → DeepFace(skip) pipeline.
+def test_embedding_service_uses_yolo_and_insightface(monkeypatch, tmp_path):
+    """Verify the YOLO → align_face → InsightFace pipeline.
 
-    We fake both the YOLO model output and DeepFace.represent so the test
+    We fake both the YOLO model output and InsightFace app so the test
     runs instantly without real model weights or a real face image.
     """
     import cv2
@@ -91,26 +91,18 @@ def test_embedding_service_uses_yolo_and_deepface_arcface(monkeypatch, tmp_path)
 
     captured = {}
 
-    # -- Fake DeepFace that records how it was called --
-    class FakeDeepFace:
-        @staticmethod
-        def represent(img_path, model_name, enforce_detection, detector_backend, align):
-            captured["img_path_type"] = type(img_path).__name__
-            captured["model_name"] = model_name
-            captured["enforce_detection"] = enforce_detection
-            captured["detector_backend"] = detector_backend
-            captured["align"] = align
-            return [{"embedding": [0.1, 0.2, 0.3]}]
-
-    fake_deepface_module = types.ModuleType("deepface")
-    fake_deepface_module.DeepFace = FakeDeepFace
-    monkeypatch.setitem(sys.modules, "deepface", fake_deepface_module)
+    class FakeInsightFaceRecognizer:
+        def get_feat(self, img):
+            captured["img_type"] = type(img).__name__
+            captured["img_shape"] = img.shape
+            return np.array([0.1, 0.2, 0.3], dtype=np.float32)
 
     # -- Fake YOLO model that returns one detection with box + keypoints --
     class FakeBoxes:
         def __init__(self, img_h, img_w):
             import torch
             self.xyxy = torch.tensor([[5, 5, img_w - 5, img_h - 5]])
+            self.conf = torch.tensor([0.95])
 
         def __len__(self):
             return 1
@@ -121,6 +113,7 @@ def test_embedding_service_uses_yolo_and_deepface_arcface(monkeypatch, tmp_path)
             # 5 keypoints: left_eye, right_eye, nose, left_mouth, right_mouth
             self.xy = torch.tensor([[[15, 15], [img_w - 15, 15], [img_w // 2, img_h // 2],
                                      [15, img_h - 10], [img_w - 15, img_h - 10]]], dtype=torch.float32)
+            self.conf = torch.tensor([[0.9, 0.9, 0.9, 0.9, 0.9]], dtype=torch.float32)
 
     class FakeDetectionResult:
         def __init__(self, img_h, img_w):
@@ -148,15 +141,13 @@ def test_embedding_service_uses_yolo_and_deepface_arcface(monkeypatch, tmp_path)
     service = embedding_mod.EmbeddingService()
     # Inject fake YOLO model directly (skip lazy-load)
     service._yolo_model = FakeYOLO()
-    service._deepface_class = FakeDeepFace
+    service._insightface_recognizer = FakeInsightFaceRecognizer()
 
     embeddings = service.extract_embeddings(frame_bytes)
 
     assert embeddings == [[0.1, 0.2, 0.3]]
-    assert captured["img_path_type"] == "ndarray"
-    assert captured["model_name"] == "ArcFace"
-    assert captured["detector_backend"] == "skip"
-    assert captured["align"] is False
+    assert captured["img_type"] == "ndarray"
+    assert captured["img_shape"] == (112, 112, 3)
 
 
 def test_storage_service_saves_guest_frame_under_dated_subdirectory(tmp_path, monkeypatch):

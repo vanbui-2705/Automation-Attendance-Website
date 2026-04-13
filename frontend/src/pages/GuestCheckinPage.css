@@ -210,6 +210,21 @@
   gap: 12px;
 }
 
+.kiosk-camera-select {
+  display: grid;
+  gap: 6px;
+  min-width: 240px;
+}
+
+.kiosk-camera-select select {
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(118, 145, 209, 0.35);
+  background: rgba(11, 19, 36, 0.75);
+  color: rgba(239, 244, 255, 0.92);
+  padding: 0 12px;
+}
+
 .kiosk-side-panel {
   display: grid;
   gap: 20px;
@@ -387,6 +402,10 @@
   .kiosk-live-pill {
     width: 100%;
     justify-content: center;
+  }
+
+  .kiosk-camera-select {
+    min-width: 100%;
   }
 
   .kiosk-camera-panel,

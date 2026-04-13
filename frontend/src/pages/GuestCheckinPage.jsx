@@ -58,7 +58,16 @@ function getHistoryBadge(entry) {
 }
 
 export default function GuestCheckinPage() {
-  const { videoRef, cameraState, cameraError, retryCamera, stopCamera } = useGuestCamera();
+  const {
+    videoRef,
+    cameraState,
+    cameraError,
+    retryCamera,
+    stopCamera,
+    cameraDevices = [],
+    selectedCameraId = "",
+    selectCamera,
+  } = useGuestCamera();
   const [scanMode, setScanMode] = useState("scanning");
   const [submissionState, setSubmissionState] = useState("idle");
   const [result, setResult] = useState(null);
@@ -195,6 +204,12 @@ export default function GuestCheckinPage() {
     }
   }
 
+  async function handleCameraChange(event) {
+    const nextDeviceId = event.target.value;
+    if (!nextDeviceId || !selectCamera) return;
+    await selectCamera(nextDeviceId);
+  }
+
   const confidence = getConfidenceValue(result?.distance);
   const confidenceStroke = 339.292;
   const confidenceOffset = confidenceStroke - (confidence / 100) * confidenceStroke;
@@ -262,6 +277,24 @@ export default function GuestCheckinPage() {
             </div>
 
             <div className="kiosk-toolbar-actions">
+              {cameraDevices.length > 0 ? (
+                <label className="kiosk-camera-select" htmlFor="camera-device-select">
+                  <span className="text-muted">Nguồn camera</span>
+                  <select
+                    id="camera-device-select"
+                    value={selectedCameraId || cameraDevices[0].deviceId}
+                    onChange={handleCameraChange}
+                    disabled={isBusy}
+                  >
+                    {cameraDevices.map((device) => (
+                      <option key={device.deviceId} value={device.deviceId}>
+                        {device.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
               {isPaused ? (
                 <button
                   type="button"

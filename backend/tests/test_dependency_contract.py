@@ -15,8 +15,8 @@ def _declared_requirements():
     return packages
 
 
-def test_deepface_requires_tf_keras_package():
+def test_insightface_requires_onnxruntime_package():
     packages = _declared_requirements()
 
-    assert "deepface" in packages
-    assert "tf-keras" in packages
+    assert "insightface" in packages
+    assert "onnxruntime" in packages

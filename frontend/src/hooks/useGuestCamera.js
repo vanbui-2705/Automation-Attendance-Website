@@ -19,6 +19,8 @@ export function useGuestCamera() {
   const streamRef = useRef(null);
   const [cameraState, setCameraState] = useState("idle");
   const [cameraError, setCameraError] = useState("");
+  const [cameraDevices, setCameraDevices] = useState([]);
+  const [selectedCameraId, setSelectedCameraId] = useState("");
 
   const stopCamera = useCallback(() => {
     const video = videoRef.current;
@@ -35,7 +37,24 @@ export function useGuestCamera() {
     streamRef.current = null;
   }, []);
 
-  const startCamera = useCallback(async () => {
+  const refreshCameraDevices = useCallback(async () => {
+    if (!navigator?.mediaDevices?.enumerateDevices) {
+      return [];
+    }
+
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoDevices = devices
+      .filter((device) => device.kind === "videoinput")
+      .map((device, index) => ({
+        deviceId: device.deviceId,
+        label: device.label || `Camera ${index + 1}`,
+      }));
+
+    setCameraDevices(videoDevices);
+    return videoDevices;
+  }, []);
+
+  const startCamera = useCallback(async (deviceIdOverride) => {
     if (!navigator?.mediaDevices?.getUserMedia) {
       setCameraState("unavailable");
       setCameraError("Trình duyệt này không hỗ trợ camera.");
@@ -46,8 +65,11 @@ export function useGuestCamera() {
     setCameraError("");
 
     try {
+      stopCamera();
+
+      const preferredDeviceId = deviceIdOverride ?? selectedCameraId;
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
+        video: preferredDeviceId ? { deviceId: { exact: preferredDeviceId } } : { facingMode: "user" },
         audio: false,
       });
 
@@ -61,6 +83,15 @@ export function useGuestCamera() {
         }
       }
 
+      const activeTrack = stream.getVideoTracks()[0];
+      const activeSettings = activeTrack?.getSettings?.() ?? {};
+      const activeDeviceId = activeSettings.deviceId || preferredDeviceId || "";
+      if (activeDeviceId) {
+        setSelectedCameraId(activeDeviceId);
+      }
+
+      await refreshCameraDevices();
+
       setCameraState("ready");
       return true;
     } catch (error) {
@@ -70,17 +101,29 @@ export function useGuestCamera() {
       setCameraError(getCameraErrorMessage(error));
       return false;
     }
-  }, []);
+  }, [refreshCameraDevices, selectedCameraId, stopCamera]);
+
+  const selectCamera = useCallback(async (deviceId) => {
+    setSelectedCameraId(deviceId);
+    return startCamera(deviceId);
+  }, [startCamera]);
 
   useEffect(() => {
     void startCamera();
     return () => stopCamera();
   }, [startCamera, stopCamera]);
 
+  useEffect(() => {
+    void refreshCameraDevices();
+  }, [refreshCameraDevices]);
+
   return {
+    cameraDevices,
     cameraError,
     cameraState,
+    selectedCameraId,
     retryCamera: startCamera,
+    selectCamera,
     startCamera,
     stopCamera,
     videoRef,
