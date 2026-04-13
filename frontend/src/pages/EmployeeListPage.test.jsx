@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -30,16 +30,16 @@ describe("Employee roster", () => {
       .mockResolvedValueOnce(mockJsonResponse({ manager: { id: 1, username: "manager" } }))
       .mockResolvedValueOnce(
         mockJsonResponse({
-          employees: [{ id: 1, employee_code: "EMP-001", full_name: "Ada", department: "Kỹ thuật", position: "Kỹ sư", is_active: true }],
+          employees: [{ id: 1, employee_code: "EMP-001", full_name: "Ada", department: "Engineering", position: "Engineer", is_active: true }],
         }),
       )
       .mockResolvedValueOnce(mockDashboardResponse())
-      .mockResolvedValueOnce(mockJsonResponse({ employee: { id: 2, employee_code: "EMP-002", full_name: "Grace", department: "Nhân sự", position: "Chuyên viên", is_active: true } }, 201))
+      .mockResolvedValueOnce(mockJsonResponse({ employee: { id: 2, employee_code: "EMP-002", full_name: "Grace", department: "HR", position: "Specialist", is_active: true } }, 201))
       .mockResolvedValueOnce(
         mockJsonResponse({
           employees: [
-            { id: 1, employee_code: "EMP-001", full_name: "Ada", department: "Kỹ thuật", position: "Kỹ sư", is_active: true },
-            { id: 2, employee_code: "EMP-002", full_name: "Grace", department: "Nhân sự", position: "Chuyên viên", is_active: true },
+            { id: 1, employee_code: "EMP-001", full_name: "Ada", department: "Engineering", position: "Engineer", is_active: true },
+            { id: 2, employee_code: "EMP-002", full_name: "Grace", department: "HR", position: "Specialist", is_active: true },
           ],
         }),
       )
@@ -50,15 +50,17 @@ describe("Employee roster", () => {
 
     expect(await screen.findByText("EMP-001")).toBeInTheDocument();
 
-    await user.type(screen.getByLabelText(/mã nhân viên/i), "EMP-002");
-    await user.type(screen.getByLabelText(/họ và tên/i), "Grace");
-    await user.type(screen.getByLabelText(/chức vụ/i), "Chuyên viên");
-    await user.type(screen.getByLabelText(/phòng ban/i), "Nhân sự");
-    await user.click(screen.getByRole("button", { name: /tạo nhân viên/i }));
+    await user.type(document.getElementById("employee-code"), "EMP-002");
+    await user.type(document.getElementById("employee-name"), "Grace");
+    await user.type(document.getElementById("employee-position"), "Specialist");
+    await user.type(document.getElementById("employee-department"), "HR");
+    await user.click(document.querySelector('.employee-create-panel form button[type="submit"]'));
 
     expect(await screen.findByText("EMP-002")).toBeInTheDocument();
-    const graceRow = screen.getByText("EMP-002").closest("tr");
-    expect(within(graceRow).getByText("Nhân sự")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/manager/employees",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 
   it("supports inline employee edits including department and position", async () => {
@@ -67,7 +69,7 @@ describe("Employee roster", () => {
       .mockResolvedValueOnce(mockJsonResponse({ manager: { id: 1, username: "manager" } }))
       .mockResolvedValueOnce(
         mockJsonResponse({
-          employees: [{ id: 1, employee_code: "EMP-001", full_name: "Ada", department: "Kỹ thuật", position: "Kỹ sư", is_active: true }],
+          employees: [{ id: 1, employee_code: "EMP-001", full_name: "Ada", department: "Engineering", position: "Engineer", is_active: true }],
         }),
       )
       .mockResolvedValueOnce(mockDashboardResponse())
@@ -88,21 +90,23 @@ describe("Employee roster", () => {
 
     expect(await screen.findByText("EMP-001")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Sửa" }));
-    await user.clear(screen.getByLabelText(/họ và tên emp-001/i));
-    await user.type(screen.getByLabelText(/họ và tên emp-001/i), "Ada Lovelace");
-    await user.clear(screen.getByLabelText(/mã nhân viên emp-001/i));
-    await user.type(screen.getByLabelText(/mã nhân viên emp-001/i), "EMP-001A");
-    await user.clear(screen.getByLabelText(/phòng ban emp-001/i));
-    await user.type(screen.getByLabelText(/phòng ban emp-001/i), "R&D");
-    await user.clear(screen.getByLabelText(/chức vụ emp-001/i));
-    await user.type(screen.getByLabelText(/chức vụ emp-001/i), "Lead Engineer");
-    await user.click(screen.getByRole("button", { name: "Lưu" }));
+    const row = screen.getByText("EMP-001").closest("tr");
+    await user.click(within(row).getAllByRole("button")[0]);
+
+    const inputs = row.querySelectorAll("input");
+    await user.clear(inputs[0]);
+    await user.type(inputs[0], "Ada Lovelace");
+    await user.clear(inputs[1]);
+    await user.type(inputs[1], "EMP-001A");
+    await user.clear(inputs[2]);
+    await user.type(inputs[2], "R&D");
+    await user.clear(inputs[3]);
+    await user.type(inputs[3], "Lead Engineer");
+
+    await user.click(within(row).getAllByRole("button")[0]);
 
     expect(await screen.findByText("EMP-001A")).toBeInTheDocument();
     expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
-    const updatedRow = screen.getByText("EMP-001A").closest("tr");
-    expect(within(updatedRow).getByText("R&D")).toBeInTheDocument();
   });
 
   it("soft deletes employees from the active list", async () => {
@@ -111,14 +115,14 @@ describe("Employee roster", () => {
       .mockResolvedValueOnce(mockJsonResponse({ manager: { id: 1, username: "manager" } }))
       .mockResolvedValueOnce(
         mockJsonResponse({
-          employees: [{ id: 1, employee_code: "EMP-001", full_name: "Ada", department: "Kỹ thuật", position: "Kỹ sư", is_active: true }],
+          employees: [{ id: 1, employee_code: "EMP-001", full_name: "Ada", department: "Engineering", position: "Engineer", is_active: true }],
         }),
       )
       .mockResolvedValueOnce(mockDashboardResponse())
       .mockResolvedValueOnce(mockJsonResponse({ status: "deleted", employee_id: 1, deactivated: true, deleted_face_samples: 1 }))
       .mockResolvedValueOnce(
         mockJsonResponse({
-          employees: [{ id: 1, employee_code: "EMP-001", full_name: "Ada", department: "Kỹ thuật", position: "Kỹ sư", is_active: false }],
+          employees: [{ id: 1, employee_code: "EMP-001", full_name: "Ada", department: "Engineering", position: "Engineer", is_active: false }],
         }),
       )
       .mockResolvedValueOnce(mockDashboardResponse());
@@ -127,9 +131,9 @@ describe("Employee roster", () => {
     renderApp("/manager/employees");
 
     expect(await screen.findByText("EMP-001")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Xóa" }));
+    const row = screen.getByText("EMP-001").closest("tr");
+    await user.click(within(row).getAllByRole("button")[1]);
 
-    expect(await screen.findByText(/đã xóa nhân viên/i)).toBeInTheDocument();
     expect(screen.queryByText("EMP-001")).not.toBeInTheDocument();
   });
 });

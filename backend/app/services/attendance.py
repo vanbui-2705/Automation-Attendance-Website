@@ -1,4 +1,4 @@
-from collections import defaultdict
+﻿from collections import defaultdict
 from datetime import datetime, date, time
 
 from sqlalchemy.exc import IntegrityError
@@ -90,14 +90,15 @@ class AttendanceService:
         today = now.date()
         month_start = today.replace(day=1)
 
-        employees = Employee.query.order_by(Employee.id.asc()).all()
+        employees = Employee.query.filter(Employee.is_active.is_(True)).order_by(Employee.id.asc()).all()
         total_employees = len(employees)
         employee_map = {employee.id: employee for employee in employees}
+        active_employee_ids = set(employee_map)
 
         today_events = AttendanceEvent.query.filter(AttendanceEvent.checkin_date == today.isoformat()).all()
         month_events = AttendanceEvent.query.filter(AttendanceEvent.checkin_date >= month_start.isoformat()).all()
 
-        unique_today_ids = {event.employee_id for event in today_events}
+        unique_today_ids = {event.employee_id for event in today_events if event.employee_id in active_employee_ids}
         on_time_today = sum(1 for event in today_events if _derive_status(event.checked_in_at) == 'On-time')
         late_today = sum(1 for event in today_events if _derive_status(event.checked_in_at) == 'Late')
         absent_today = max(total_employees - len(unique_today_ids), 0)
@@ -137,7 +138,7 @@ class AttendanceService:
                     'id': employee.id,
                     'employee_code': employee.employee_code,
                     'full_name': employee.full_name,
-                    'department': employee.department or 'Văn phòng',
+                    'department': employee.department or 'VÄƒn phÃ²ng',
                     'position': employee.position or 'Nhan vien',
                     'is_active': employee.is_active,
                     'total_days_worked': total_days_worked,
@@ -165,3 +166,4 @@ class AttendanceService:
 
     def get_attendance_event(self, attendance_id):
         return db.session.get(AttendanceEvent, attendance_id)
+
