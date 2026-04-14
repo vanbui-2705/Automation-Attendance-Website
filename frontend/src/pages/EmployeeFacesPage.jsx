@@ -121,6 +121,20 @@ export default function EmployeeFacesPage() {
     }
   }
 
+  function handleBatchFilesChange(event) {
+    const selectedFiles = Array.from(event.target.files || []);
+    if (selectedFiles.length === 0) {
+      return;
+    }
+
+    setFiles((previousFiles) => {
+      const mergedFiles = [...previousFiles, ...selectedFiles];
+      return mergedFiles.slice(0, TOTAL_SLOTS);
+    });
+
+    event.target.value = "";
+  }
+
   return (
     <div className="page-shell">
       <div className="page-header">
@@ -209,7 +223,7 @@ export default function EmployeeFacesPage() {
           <form className="field-group" onSubmit={handleEnroll}>
             <div className="field">
               <label htmlFor="face-files">Ảnh khuôn mặt</label>
-              <input id="face-files" type="file" accept="image/*" multiple onChange={(event) => setFiles(Array.from(event.target.files || []))} />
+              <input id="face-files" type="file" accept="image/*" multiple onChange={handleBatchFilesChange} />
             </div>
             <div className="pill">
               {files.length} / {TOTAL_SLOTS} ảnh đã chọn
