@@ -1,0 +1,568 @@
+﻿.simple-scanner-card {
+  padding: 18px;
+}
+
+.simple-scanner-stage {
+  position: relative;
+  min-height: 560px;
+  overflow: hidden;
+  border-radius: 34px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(20, 43, 111, 0.22), transparent 28%),
+    linear-gradient(160deg, #050a18 0%, #081427 42%, #0a1730 100%);
+  border: 1px solid rgba(91, 122, 223, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 24px 56px rgba(7, 15, 35, 0.24);
+}
+
+.simple-scanner-stage::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 28px;
+  border: 1px solid rgba(125, 151, 255, 0.08);
+  pointer-events: none;
+}
+
+.simple-scanner-stage.is-capturing::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(139, 237, 255, 0.2), rgba(139, 237, 255, 0) 58%);
+  animation: simpleCaptureFlash 360ms ease-out;
+  pointer-events: none;
+}
+
+.simple-scanner-video {
+  width: 100%;
+  height: 100%;
+  min-height: 560px;
+  object-fit: cover;
+  opacity: 0.26;
+  filter: saturate(0.72) brightness(0.54) contrast(1.04);
+}
+
+.simple-scanner-overlay {
+  position: absolute;
+  inset: 0;
+  padding: 28px;
+}
+
+.simple-scanner-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at center, transparent 16%, rgba(5, 10, 22, 0.12) 32%, rgba(3, 8, 18, 0.84) 100%),
+    linear-gradient(180deg, rgba(4, 10, 24, 0.34) 0%, rgba(3, 8, 18, 0.08) 30%, rgba(4, 10, 24, 0.52) 100%);
+}
+
+.simple-scanner-gridlines {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(111, 152, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(111, 152, 255, 0.05) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.82), transparent 76%);
+  opacity: 0.14;
+}
+
+.simple-scanner-radar {
+  position: absolute;
+  inset: 46% auto auto 50%;
+  width: 360px;
+  height: 360px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px solid rgba(87, 124, 255, 0.12);
+  box-shadow: 0 0 0 18px rgba(49, 95, 255, 0.02);
+  animation: simpleRadarPulse 6.2s ease-in-out infinite;
+}
+
+.simple-scanner-center {
+  position: absolute;
+  inset: 42% auto auto 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  z-index: 2;
+  transition: transform 280ms ease;
+}
+
+.simple-scanner-stage.pose-left .simple-scanner-center {
+  transform: translate(-53%, -50%) rotate(-3deg);
+}
+
+.simple-scanner-stage.pose-right .simple-scanner-center {
+  transform: translate(-47%, -50%) rotate(3deg);
+}
+
+.simple-scanner-stage.pose-up .simple-scanner-center {
+  transform: translate(-50%, -53%) rotate(-2deg);
+}
+
+.simple-scanner-stage.pose-down .simple-scanner-center {
+  transform: translate(-50%, -47%) rotate(2deg);
+}
+
+.simple-biometric-frame {
+  position: relative;
+  width: 296px;
+  height: 362px;
+}
+
+.simple-orbit-ring,
+.simple-biometric-oval,
+.simple-biometric-glow,
+.simple-biometric-arc,
+.simple-biometric-corner,
+.simple-biometric-scanline {
+  position: absolute;
+}
+
+.simple-orbit-ring {
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px solid rgba(84, 130, 255, 0.12);
+}
+
+.simple-orbit-ring::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 3px solid transparent;
+  border-top-color: rgba(94, 227, 255, 0.82);
+  border-right-color: rgba(94, 227, 255, 0.16);
+  animation: simpleOrbitSpin 7.4s linear infinite;
+}
+
+.simple-orbit-ring.outer {
+  width: 330px;
+  height: 330px;
+  opacity: 0.68;
+}
+
+.simple-orbit-ring.inner {
+  width: 256px;
+  height: 256px;
+  opacity: 0.52;
+}
+
+.simple-orbit-ring.inner::before {
+  animation-duration: 5.2s;
+  animation-direction: reverse;
+}
+
+.simple-scanner-stage.pose-left .simple-orbit-ring::before {
+  animation-direction: reverse;
+}
+
+.simple-biometric-oval {
+  inset: 0;
+  border-radius: 50% / 44%;
+  border: 2px solid rgba(97, 149, 255, 0.9);
+  box-shadow:
+    0 0 0 10px rgba(31, 80, 223, 0.04),
+    0 0 30px rgba(41, 98, 255, 0.18),
+    inset 0 0 22px rgba(75, 217, 255, 0.05);
+}
+
+.simple-biometric-oval.inner {
+  inset: 32px 38px;
+  border-width: 1px;
+  border-color: rgba(92, 228, 255, 0.34);
+  opacity: 0.84;
+}
+
+.simple-biometric-glow {
+  inset: 18px 16px;
+  border-radius: 50% / 44%;
+  background: radial-gradient(circle at 50% 40%, rgba(88, 218, 255, 0.14), transparent 52%);
+  filter: blur(12px);
+  animation: simpleGlowPulse 3.8s ease-in-out infinite;
+}
+
+.simple-biometric-arc {
+  top: 20px;
+  left: 22px;
+  width: 252px;
+  height: 322px;
+  border-radius: 50% / 44%;
+  border: 4px solid transparent;
+  border-top-color: rgba(93, 239, 255, 0.88);
+  border-left-color: rgba(93, 239, 255, 0.26);
+  filter: drop-shadow(0 0 10px rgba(93, 239, 255, 0.22));
+  animation: simpleArcRotate 5.8s linear infinite;
+}
+
+.simple-biometric-scanline {
+  top: 50%;
+  left: 34px;
+  right: 34px;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent 0%, rgba(120, 233, 255, 0.12) 18%, rgba(142, 245, 255, 0.76) 50%, rgba(120, 233, 255, 0.12) 82%, transparent 100%);
+  box-shadow: 0 0 12px rgba(109, 226, 255, 0.42);
+  animation: simpleScanBeam 3.1s ease-in-out infinite;
+}
+
+.simple-biometric-corner {
+  width: 34px;
+  height: 34px;
+  color: rgba(136, 170, 255, 0.72);
+}
+
+.simple-biometric-corner.corner-top-left {
+  top: -8px;
+  left: -8px;
+  border-top: 3px solid currentColor;
+  border-left: 3px solid currentColor;
+  border-top-left-radius: 14px;
+}
+
+.simple-biometric-corner.corner-top-right {
+  top: -8px;
+  right: -8px;
+  border-top: 3px solid currentColor;
+  border-right: 3px solid currentColor;
+  border-top-right-radius: 14px;
+}
+
+.simple-biometric-corner.corner-bottom-left {
+  bottom: -8px;
+  left: -8px;
+  border-bottom: 3px solid currentColor;
+  border-left: 3px solid currentColor;
+  border-bottom-left-radius: 14px;
+}
+
+.simple-biometric-corner.corner-bottom-right {
+  bottom: -8px;
+  right: -8px;
+  border-bottom: 3px solid currentColor;
+  border-right: 3px solid currentColor;
+  border-bottom-right-radius: 14px;
+}
+
+.simple-status-stack {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  display: grid;
+  gap: 8px;
+  z-index: 3;
+}
+
+.simple-status-pill {
+  min-width: 148px;
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 14px;
+  background: rgba(12, 19, 36, 0.62);
+  border: 1px solid rgba(121, 149, 243, 0.12);
+  color: rgba(224, 233, 252, 0.92);
+  font-size: 11px;
+  backdrop-filter: blur(12px);
+}
+
+.simple-status-label {
+  color: rgba(173, 191, 230, 0.74);
+  letter-spacing: 0.04em;
+}
+
+.simple-status-pill strong {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.simple-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #8292b8;
+}
+
+.simple-status-pill.is-success .simple-status-dot {
+  background: #23d8a0;
+  box-shadow: 0 0 0 6px rgba(35, 216, 160, 0.1);
+}
+
+.simple-status-pill.is-warning .simple-status-dot {
+  background: #ffc15a;
+  box-shadow: 0 0 0 6px rgba(255, 193, 90, 0.1);
+}
+
+.simple-scanner-info-card {
+  position: absolute;
+  left: 50%;
+  bottom: 42px;
+  transform: translateX(-50%);
+  width: min(520px, calc(100% - 72px));
+  display: grid;
+  gap: 14px;
+  padding: 20px 22px;
+  border-radius: 28px;
+  background: rgba(8, 14, 28, 0.72);
+  border: 1px solid rgba(96, 130, 222, 0.16);
+  box-shadow: 0 20px 44px rgba(1, 6, 16, 0.34);
+  backdrop-filter: blur(18px);
+  z-index: 4;
+}
+
+.simple-info-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(188, 214, 255, 0.88);
+}
+
+.simple-info-spinner {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #63deff;
+  box-shadow: 0 0 0 6px rgba(99, 222, 255, 0.12);
+  animation: simplePulseDot 1.5s ease-in-out infinite;
+}
+
+.simple-info-title {
+  margin: 0;
+  font-size: clamp(1.8rem, 2vw, 2.2rem);
+  line-height: 1.05;
+  color: #f3f7ff;
+}
+
+.simple-info-description {
+  margin: 0;
+  max-width: 46ch;
+  font-size: 14px;
+  line-height: 1.55;
+  color: rgba(198, 213, 241, 0.82);
+}
+
+.simple-info-progress {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.simple-progress-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(113, 140, 214, 0.08);
+  color: rgba(173, 191, 230, 0.84);
+  font-size: 12px;
+}
+
+.simple-progress-step.is-done {
+  color: #eaf8ff;
+  border-color: rgba(61, 228, 187, 0.18);
+  background: rgba(39, 221, 178, 0.08);
+}
+
+.simple-progress-step.is-active {
+  border-color: rgba(97, 188, 255, 0.18);
+  background: rgba(47, 115, 255, 0.08);
+}
+
+.simple-progress-step.is-error {
+  border-color: rgba(255, 132, 132, 0.18);
+  background: rgba(255, 99, 99, 0.08);
+}
+
+.simple-progress-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.9;
+}
+
+.simple-info-actions {
+  display: flex;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.simple-info-btn {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(113, 140, 214, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e8efff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.simple-info-btn.is-primary {
+  border: none;
+  background: linear-gradient(135deg, #0f2e9f, #1e49e6);
+}
+
+.simple-utility-dock {
+  position: absolute;
+  right: 24px;
+  bottom: 26px;
+  display: inline-flex;
+  gap: 10px;
+  z-index: 4;
+}
+
+.simple-utility-btn {
+  width: 46px;
+  height: 46px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(245, 248, 255, 0.12);
+  color: #dbe7ff;
+  font-size: 18px;
+  backdrop-filter: blur(12px);
+  box-shadow: inset 0 0 0 1px rgba(123, 150, 222, 0.14);
+  cursor: pointer;
+}
+
+@keyframes simpleRadarPulse {
+  0%, 100% { opacity: 0.18; transform: translate(-50%, -50%) scale(0.98); }
+  50% { opacity: 0.36; transform: translate(-50%, -50%) scale(1.02); }
+}
+
+@keyframes simpleOrbitSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes simpleArcRotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes simpleScanBeam {
+  0% { transform: translateY(-108px); opacity: 0.16; }
+  45% { opacity: 0.8; }
+  100% { transform: translateY(108px); opacity: 0.2; }
+}
+
+@keyframes simpleGlowPulse {
+  0%, 100% { opacity: 0.34; transform: scale(0.99); }
+  50% { opacity: 0.6; transform: scale(1.01); }
+}
+
+@keyframes simpleCaptureFlash {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes simplePulseDot {
+  0%, 100% { transform: scale(0.92); opacity: 0.66; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+@media (max-width: 1180px) {
+  .simple-face-layout { grid-template-columns: 1fr; }
+  .simple-face-sidebar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 920px) {
+  .simple-face-sidebar,
+  .simple-gallery-grid,
+  .simple-employee-meta { grid-template-columns: 1fr; }
+
+  .simple-gallery-card .row-between,
+  .simple-face-footer { align-items: flex-start; gap: 12px; }
+
+  .simple-scanner-stage,
+  .simple-scanner-video { min-height: 500px; }
+
+  .simple-scanner-overlay { padding: 18px; }
+
+  .simple-status-stack {
+    top: 18px;
+    left: 18px;
+    right: 18px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .simple-status-pill { min-width: 0; }
+  .simple-scanner-radar { width: 300px; height: 300px; }
+  .simple-biometric-frame { width: 266px; height: 326px; }
+  .simple-orbit-ring.outer { width: 296px; height: 296px; }
+  .simple-orbit-ring.inner { width: 234px; height: 234px; }
+  .simple-biometric-arc { width: 224px; height: 286px; }
+  .simple-scanner-info-card {
+    width: calc(100% - 36px);
+    bottom: 24px;
+  }
+
+  .simple-info-progress {
+    grid-template-columns: 1fr;
+  }
+
+  .simple-utility-dock {
+    top: 18px;
+    right: 18px;
+    bottom: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .simple-scanner-stage,
+  .simple-scanner-video { min-height: 470px; }
+
+  .simple-status-stack {
+    position: static;
+    margin-bottom: 18px;
+    grid-template-columns: 1fr;
+  }
+
+  .simple-scanner-center {
+    inset: 38% auto auto 50%;
+  }
+
+  .simple-scanner-radar { width: 250px; height: 250px; }
+  .simple-biometric-frame { width: 214px; height: 272px; }
+  .simple-orbit-ring.outer { width: 240px; height: 240px; }
+  .simple-orbit-ring.inner { width: 190px; height: 190px; }
+  .simple-biometric-oval.inner { inset: 24px 28px; }
+  .simple-biometric-arc { top: 18px; left: 18px; width: 178px; height: 236px; }
+  .simple-biometric-scanline { left: 28px; right: 28px; }
+
+  .simple-scanner-info-card {
+    width: calc(100% - 24px);
+    padding: 16px;
+    bottom: 14px;
+  }
+
+  .simple-info-title {
+    font-size: 1.55rem;
+  }
+
+  .simple-info-description {
+    font-size: 13px;
+  }
+
+  .simple-info-actions {
+    flex-direction: column;
+  }
+
+  .simple-utility-dock {
+    top: 14px;
+    right: 14px;
+    gap: 8px;
+  }
+
+  .simple-utility-btn {
+    width: 42px;
+    height: 42px;
+  }
+}

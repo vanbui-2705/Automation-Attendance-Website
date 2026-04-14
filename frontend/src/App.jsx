@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+﻿import { Navigate, Route, Routes } from "react-router-dom";
 import { ManagerAuthProvider } from "./context/ManagerAuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ManagerLayout from "./components/ManagerLayout";
@@ -6,6 +6,7 @@ import GuestCheckinPage from "./pages/GuestCheckinPage";
 import ManagerLoginPage from "./pages/ManagerLoginPage";
 import EmployeeListPage from "./pages/EmployeeListPage";
 import EmployeeFacesPage from "./pages/EmployeeFacesPage";
+import EmployeeFaceScannerPage from "./pages/EmployeeFaceScannerPage";
 import AttendancePage from "./pages/AttendancePage";
 import DashboardPage from "./pages/DashboardPage";
 import ReportsPage from "./pages/ReportsPage";
@@ -29,6 +30,7 @@ export function App() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="employees" element={<EmployeeListPage />} />
           <Route path="employees/:employeeId/faces" element={<EmployeeFacesPage />} />
+          <Route path="employees/:employeeId/face-registration" element={<EmployeeFaceScannerPage />} />
           <Route path="attendance" element={<AttendancePage />} />
           <Route path="reports" element={<ReportsPage />} />
         </Route>

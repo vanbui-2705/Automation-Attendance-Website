@@ -4,14 +4,15 @@
 # Pipeline mới (YOLOv12-first):
 #   1. YOLO detect → tìm khuôn mặt + keypoints
 #   2. align_face() → xoay thẳng dựa trên vị trí 2 mắt
-#   3. DeepFace.represent(detector_backend="skip") → sinh vector
+#   3. InsightFace get_feat() → sinh vector từ ảnh đã align
 #
 # Pipeline cũ (đã thay thế):
 #   DeepFace.represent(enforce_detection=False) → tự detect + embed
-#   Vấn đề: dùng OpenCV Haar Cascade → kém chính xác
+#   Vấn đề: phụ thuộc TensorFlow stack, nặng khi triển khai
 # ============================================================
 
 import logging
+import importlib
 from pathlib import Path
 
 import cv2
@@ -26,18 +27,96 @@ _DEFAULT_MODEL_PATH = Path(__file__).parent / "yolov12n-face.pt"
 
 
 class EmbeddingService:
-    """Trích xuất face embeddings bằng YOLO (detect) + ArcFace (embed).
+    """Trích xuất face embeddings bằng YOLO (detect) + InsightFace (embed).
 
     Model YOLO được nạp một lần duy nhất khi lần đầu gọi
     ``extract_embeddings`` (lazy-load) để tránh làm chậm quá trình
     khởi tạo Flask app.
     """
 
-    def __init__(self, model_path=None, yolo_confidence=0.5):
+    def __init__(
+        self,
+        model_path=None,
+        yolo_confidence=0.5,
+        min_box_conf=0.25,
+        min_head_kpts=2,
+        kpt_conf=0.2,
+        min_face_size=48,
+        high_conf_box_without_kpts=0.65,
+        insightface_rec_model_path=None,
+        insightface_model_name="buffalo_l",
+        insightface_det_size=(320, 320),
+        insightface_providers=None,
+    ):
         self._model_path = str(model_path or _DEFAULT_MODEL_PATH)
         self._yolo_confidence = yolo_confidence
+        self._min_box_conf = float(min_box_conf)
+        self._min_head_kpts = int(min_head_kpts)
+        self._kpt_conf = float(kpt_conf)
+        self._min_face_size = int(min_face_size)
+        self._high_conf_box_without_kpts = float(high_conf_box_without_kpts)
+        default_rec_model_path = Path.home() / ".insightface" / "models" / "buffalo_l" / "w600k_r50.onnx"
+        self._insightface_rec_model_path = str(insightface_rec_model_path or default_rec_model_path)
+        self._insightface_model_name = insightface_model_name
+        self._insightface_det_size = tuple(insightface_det_size)
+        self._insightface_providers = list(insightface_providers or ["CPUExecutionProvider"])
         self._yolo_model = None  # Lazy-loaded
-        self._deepface_class = None  # Lazy-loaded
+        self._insightface_recognizer = None  # Lazy-loaded
+
+    def _check_quality_image(self, detections, detection_index):
+        boxes = detections.boxes
+        keypoints = detections.keypoints
+
+        if boxes is None or len(boxes) == 0:
+            return False, "skip no bounding box"
+
+        scores = boxes.conf.cpu().numpy() if boxes.conf is not None else None
+        if scores is None or len(scores) == 0:
+            return False, "skip empty box score"
+
+        best_score = float(scores[detection_index])
+        if best_score < self._min_box_conf:
+            return False, f"skip low box score ({best_score:.3f})"
+
+        box_xyxy = boxes.xyxy[detection_index].cpu().numpy().astype(int)
+        x1, y1, x2, y2 = box_xyxy
+        face_w = max(0, x2 - x1)
+        face_h = max(0, y2 - y1)
+        if min(face_w, face_h) < self._min_face_size:
+            return False, f"skip tiny face ({face_w}x{face_h})"
+
+        if keypoints is None or keypoints.xy is None:
+            if best_score >= self._high_conf_box_without_kpts:
+                return True, f"ok no keypoints but high box score ({best_score:.3f})"
+            return False, "skip no keypoints"
+
+        keypoints_xy = keypoints.xy.cpu().numpy()
+        if detection_index >= len(keypoints_xy):
+            if best_score >= self._high_conf_box_without_kpts:
+                return True, f"ok invalid keypoint index but high box score ({best_score:.3f})"
+            return False, "skip invalid keypoint index"
+
+        keypoints_conf = keypoints.conf.cpu().numpy() if keypoints.conf is not None else None
+        head_indices = [0, 1, 2, 3, 4]
+        valid_head = 0
+        for idx in head_indices:
+            if idx >= keypoints_xy.shape[1]:
+                continue
+
+            px = float(keypoints_xy[detection_index, idx, 0])
+            py = float(keypoints_xy[detection_index, idx, 1])
+            point_conf = float(keypoints_conf[detection_index, idx]) if keypoints_conf is not None else 1.0
+            if px > 0 and py > 0 and point_conf >= self._kpt_conf:
+                valid_head += 1
+
+        if valid_head < self._min_head_kpts:
+            if best_score >= self._high_conf_box_without_kpts:
+                return True, (
+                    f"ok weak keypoints ({valid_head}) but high box score ({best_score:.3f})"
+                )
+            return False, f"skip insufficient head keypoints ({valid_head})"
+
+        return True, "ok"
 
     # ------------------------------------------------------------------
     # Lazy-load model YOLO
@@ -51,12 +130,53 @@ class EmbeddingService:
             logger.info("YOLO face model loaded successfully.")
         return self._yolo_model
 
-    def _get_deepface_class(self):
-        if self._deepface_class is None:
-            from deepface import DeepFace
+    def _get_insightface_recognizer(self):
+        if self._insightface_recognizer is None:
+            ctx_id = 0 if "CUDAExecutionProvider" in self._insightface_providers else -1
+            model_zoo_module = importlib.import_module("insightface.model_zoo")
 
-            self._deepface_class = DeepFace
-        return self._deepface_class
+            model_file = Path(self._insightface_rec_model_path)
+            if model_file.is_file():
+                try:
+                    recognizer = model_zoo_module.get_model(
+                        str(model_file),
+                        providers=self._insightface_providers,
+                    )
+                    recognizer.prepare(ctx_id=ctx_id)
+                    self._insightface_recognizer = recognizer
+                    return self._insightface_recognizer
+                except Exception:
+                    logger.warning(
+                        "Cannot load recognizer from path %s, fallback to FaceAnalysis model name %s",
+                        self._insightface_rec_model_path,
+                        self._insightface_model_name,
+                        exc_info=True,
+                    )
+
+            face_analysis_module = importlib.import_module("insightface.app")
+            face_analysis_class = face_analysis_module.FaceAnalysis
+            app = face_analysis_class(
+                name=self._insightface_model_name,
+                providers=self._insightface_providers,
+            )
+            app.prepare(ctx_id=ctx_id, det_size=self._insightface_det_size)
+
+            recognizer = None
+            models = getattr(app, "models", None)
+            if isinstance(models, dict):
+                recognizer = models.get("recognition")
+                if recognizer is None:
+                    for model in models.values():
+                        if hasattr(model, "get_feat"):
+                            recognizer = model
+                            break
+
+            if recognizer is None:
+                raise RuntimeError("InsightFace recognition model is unavailable")
+
+            self._insightface_recognizer = recognizer
+
+        return self._insightface_recognizer
 
     # ------------------------------------------------------------------
     # Public API – giữ nguyên signature cũ để không phá code gọi bên ngoài
@@ -65,7 +185,7 @@ class EmbeddingService:
         """Nhận raw bytes ảnh, trả về list các embedding vectors.
 
         Returns:
-            list[list[float]]: Mỗi phần tử là 1 embedding 512-d của ArcFace.
+            list[list[float]]: Mỗi phần tử là 1 embedding của InsightFace.
             Danh sách rỗng nếu không tìm thấy khuôn mặt.
         """
         # Bước 0: Decode raw bytes → numpy BGR image
@@ -87,7 +207,14 @@ class EmbeddingService:
         keypoints_data = detections.keypoints
 
         embeddings = []
+        skip_reasons = []
         for idx in range(len(boxes)):
+            is_qualified, reason = self._check_quality_image(detections, idx)
+            if not is_qualified:
+                logger.debug("Skipping face #%d before embedding: %s", idx, reason)
+                skip_reasons.append(reason)
+                continue
+
             # Lấy bounding box (xyxy format, convert sang int)
             box = boxes.xyxy[idx].cpu().numpy().astype(int)
             x1, y1, x2, y2 = box
@@ -103,21 +230,28 @@ class EmbeddingService:
             aligned_face = align_face(img, kps, (x1, y1, x2, y2))
 
             if aligned_face is None or aligned_face.size == 0:
+                skip_reasons.append("skip empty aligned face")
                 continue
 
-            # Bước 3: DeepFace extract embedding (skip detection vì YOLO đã làm)
+            # Bước 3: InsightFace extract embedding từ ảnh đã align
             try:
-                face_results = self._get_deepface_class().represent(
-                    img_path=aligned_face,
-                    model_name="ArcFace",
-                    enforce_detection=False,
-                    detector_backend="skip",
-                    align=False,
-                )
-                if face_results:
-                    embeddings.append(list(face_results[0]["embedding"]))
+                face_for_recognition = cv2.resize(aligned_face, (112, 112), interpolation=cv2.INTER_AREA)
+                vector = self._get_insightface_recognizer().get_feat(face_for_recognition)
+                if vector is None:
+                    skip_reasons.append("skip empty embedding vector")
+                    continue
+
+                vector_np = np.asarray(vector, dtype=np.float32)
+                if vector_np.ndim > 1:
+                    vector_np = vector_np[0]
+
+                embeddings.append(vector_np.reshape(-1).tolist())
             except Exception:
-                logger.warning("DeepFace failed on face #%d, skipping.", idx, exc_info=True)
+                logger.warning("InsightFace failed on face #%d, skipping.", idx, exc_info=True)
+                skip_reasons.append("skip insightface exception")
                 continue
+
+        if not embeddings and skip_reasons:
+            logger.info("No embedding produced. Reasons: %s", "; ".join(skip_reasons))
 
         return embeddings

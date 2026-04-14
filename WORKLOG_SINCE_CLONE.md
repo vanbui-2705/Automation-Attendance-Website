@@ -582,3 +582,207 @@ Tai khoan nay da duoc tao trong backend container dang chay.
   - `snapshot` -> `anh chup`
   - `confidence` -> `do khop`
 - Cap nhat lai test frontend de khop voi text va luong dieu huong moi.
+
+## Cap nhat trang scanner khuon mat nhan vien cho admin (2026-04-13 11:03:46)
+
+### File lien quan
+
+- `frontend/src/pages/EmployeeFaceScannerPage.jsx`
+- `frontend/src/pages/EmployeeFaceScannerPage.override.css`
+- `frontend/src/hooks/useFaceRegistration.js`
+- `frontend/src/pages/EmployeeFaceScannerPage.test.jsx`
+- `WORKLOG_SINCE_CLONE.md`
+
+### Noi dung
+
+- Tach rieng style override cho trang scanner de tranh bi anh huong boi cac block CSS cu trong `styles.css`.
+- Don gian hoa giao dien scanner theo huong mot trang rieng cho admin, khong con layout scanner cu phuc tap.
+- Nang cap khung scanner theo phong cach biometric / Face ID:
+  - video dong vai tro background
+  - vung nhan dien oval o giua
+  - them orbit ring, radar, arc, scan line va glow
+  - orbit va cum scanner lech huong theo pose khuon mat `front/left/right/up/down`
+- Sua lai layout scanner de tranh bi de control bar va caption xuong sat gallery.
+- Bo cuc responsive duoc dieu chinh lai cho tablet/mobile de status, guidance panel va control bar khong de len nhau.
+- Doi luong capture sang tu dong:
+  - khong can bam `Luu dinh danh` de chup
+  - he thong tu lay frame tot nhat cho tung goc khi nguoi dung giu dung huong
+  - du 5 goc thi tu dong gui len backend
+- Nut cuoi tren scanner chi con dong vai tro retry neu tu dong luu that bai.
+- Cap nhat lai test trang scanner theo luong moi `tu dong giu anh tot nhat` va `tu dong luu`.
+
+### Kiem tra bo sung
+
+- `npm test -- EmployeeFaceScannerPage.test.jsx`: pass
+- `npm run build`: pass
+
+### Luu y lam viec
+
+- Moi thay doi tiep theo lien quan den scanner khuon mat admin can duoc ghi bo sung vao `WORKLOG_SINCE_CLONE.md`.
+
+## Toi uu lai man hinh khoi tao camera / scanner cho ro bo cuc hon (2026-04-13 11:03:46)
+
+### File lien quan
+
+- `frontend/src/pages/EmployeeFaceScannerPage.jsx`
+- `frontend/src/pages/EmployeeFaceScannerPage.override.css`
+- `frontend/src/pages/EmployeeFaceScannerPage.test.jsx`
+- `WORKLOG_SINCE_CLONE.md`
+
+### Noi dung
+
+- Chi tap trung sua UI cua man scanner dang hien thi, khong thay doi them flow backend hay man hinh khac.
+- Giam bot do roi cua background biometric:
+  - bo bot vong sang nen
+  - ha do sang / do tuong phan cua animation
+  - giu mot cum scanner trung tam ro rang hon
+- Bo kieu banner ngang de giua man hinh, thay bang mot card thong tin nho gon o nua duoi trung tam.
+- Dinh lai hierarchy trong card scanner:
+  - dong trang thai nho
+  - tieu de chinh
+  - mo ta ngan
+  - 3 buoc tien trinh nho
+  - nut chi hien thi khi dung ngu canh
+- Nut `Tu dong luu` khong con hien nhu mot CTA chinh tren man loading; hanh dong retry chi xuat hien khi luu that bai.
+- Dua cac nut tien ich nho `lam lai / chup lai` sang mot utility dock rieng de khong pha bo cuc chinh.
+- Scanner visual van giu chat biometric nhung tro thanh background ho tro, khong lan at text.
+- Cap nhat test frontend de khop voi card khoi tao camera moi.
+
+### Kiem tra bo sung
+
+- `npm test -- EmployeeFaceScannerPage.test.jsx`: pass
+- `npm run build`: pass
+
+## Sua KPI dashboard de khong tinh nhan vien da xoa mem vao muc can theo doi (2026-04-13 11:03:46)
+
+### File lien quan
+
+- `backend/app/services/attendance.py`
+- `backend/tests/test_manager_api.py`
+- `WORKLOG_SINCE_CLONE.md`
+
+### Noi dung
+
+- Sua `get_dashboard_summary()` de cac chi so tong quan chi tinh nhan vien con hoat dong (`is_active = true`).
+- Khi nhan vien bi xoa mem o trang nhan vien, KPI tren trang tong quan se giam dung theo so nhan vien active con lai.
+- Cac gia tri duoc sua tac dong truc tiep den:
+  - `summary.total_employees`
+  - `summary.absent_today`
+  - `summary.attendance_rate`
+  - danh sach `employee_stats`
+- Bo sung test hoi quy de dam bao sau khi xoa mem nhan vien, dashboard khong con tinh nhan vien do vao muc can theo doi.
+
+
+## Chinh lai cum nut thao tac o bang nhan vien cho deu va nhat quan (2026-04-13 11:03:46)
+
+### File lien quan
+
+- `frontend/src/pages/EmployeeListPage.jsx`
+- `frontend/src/styles.css`
+- `WORKLOG_SINCE_CLONE.md`
+
+### Noi dung
+
+- Tach rieng 2 nhom nut o cot thao tac trong bang nhan vien.
+- `Face Manager` va `Face Scanner` dung cung mot form nut chinh, deu kich thuoc va padding.
+- `Sua` va `Xoa` dung cung mot form nut utility nho hon, can hang va dong deu hon voi nhom nut chinh.
+- Bo sung responsive de cum nut nay xuong hang gon hon tren man hinh hep.
+
+
+## Co dinh do rong 2 nut chinh o bang nhan vien de can deu hon (2026-04-13 11:03:46)
+
+### File lien quan
+
+- `frontend/src/styles.css`
+- `WORKLOG_SINCE_CLONE.md`
+
+### Noi dung
+
+- Chuyen cum nut thao tac o bang nhan vien sang bo cuc flex de de can hang hon.
+- Co dinh cung mot do rong cho `Face Manager` va `Face Scanner` de 2 nut chinh nhin thang hang va deu nhau hon.
+- Giu nguyen co che responsive da bo sung truoc do cho man hinh hep.
+
+
+## Bo sung backend dang ky khuon mat theo batch 20-30 frame cat tu video (2026-04-13 11:03:46)
+
+### File lien quan
+
+- `backend/app/models.py`
+- `backend/app/routes/face_enrollment.py`
+- `backend/app/services/face_batch_enrollment.py`
+- `backend/app/services/face_index.py`
+- `backend/tests/test_manager_face_enrollment_api.py`
+- `backend/tests/test_manager_api.py`
+- `WORKLOG_SINCE_CLONE.md`
+
+### Noi dung
+
+- Giu nguyen `FaceSample` de luu 5 anh final cho UI manager hien tai.
+- Them model `FaceEmbedding` de luu 1 mean embedding va cac representative embedding tach rieng khoi 5 preview samples.
+- Them route `POST /api/manager/employees/<id>/face-enrollment/batch` nhan batch 20-30 frame tu frontend.
+- Them service `face_batch_enrollment` de loc frame hop le, bo frame trung, cham diem chat luong co ban va chon 5 preview theo cac pose `front/left/right/up/down`.
+- Cap nhat `FaceIndexService` de uu tien doc `FaceEmbedding`, nhung van fallback ve `FaceSample` de giu tuong thich du lieu cu.
+- Cap nhat cleanup khi xoa khuon mat / xoa nhan vien de xoa ca `FaceEmbedding` moi.
+- Bo sung regression test cho batch enrollment va cleanup embedding moi.
+
+
+## Kiem tra va reset lai tai khoan admin local de dang nhap duoc (2026-04-13 11:03:46)
+
+### File lien quan
+
+- `backend/data/app.db`
+- `WORKLOG_SINCE_CLONE.md`
+
+### Noi dung
+
+- Xac nhan backend khong crash o startup; route login van hoat dong binh thuong.
+- Kiem tra SQLite local va xac nhan tai khoan `admin` van ton tai trong bang `manager_users`.
+- Reset lai mat khau local cua tai khoan `admin` ve `secret123` de khoi phuc truy cap admin tren may dang lam viec.
+- Verify lai bang request login va `/api/manager/me` trong app context: deu tra `200`.
+
+
+## Noi frontend scanner voi backend batch enrollment 20-30 frame (2026-04-13 11:03:46)
+
+### File lien quan
+
+- `frontend/src/lib/faceApiService.js`
+- `frontend/src/hooks/useFaceRegistration.js`
+- `WORKLOG_SINCE_CLONE.md`
+
+### Noi dung
+
+- Giu nguyen giao dien scanner hien tai, khong doi bo cuc hay luong tuong tac chinh.
+- Sua `faceApiService` de bo mock endpoint cu va gui `frames[]` len route moi `/api/manager/employees/<id>/face-enrollment/batch`.
+- Trong `useFaceRegistration`, bo sung co che am tham thu gom 20-30 frame trong luc quet 5 goc cu de backend batch co du du lieu xu ly.
+- Van giu 5 anh preview local cho UI, nhung viec luu xuong server gio di theo batch frame thay vi chi 5 anh tinh.
+- Build frontend pass sau khi noi flow moi.
+
+
+## Chay smoke test HTTP localhost cho login admin va batch enrollment 20 frame (2026-04-13 11:03:46)
+
+### File lien quan
+
+- `backend/data/http_e2e_server.py`
+- `WORKLOG_SINCE_CLONE.md`
+
+### Noi dung
+
+- Dung mot server localhost tam de verify luong HTTP that thay vi chi test client noi bo.
+- Xac nhan `POST /api/manager/login` tra `200` voi tai khoan `admin / secret123`.
+- Xac nhan `POST /api/manager/employees/<id>/face-enrollment/batch` voi 20 frame tra `201`.
+- Ket qua smoke test localhost: luu duoc `5` preview samples, tao embeddings dai dien va cleanup ve `0` ban ghi sau khi goi xoa face samples.
+
+
+## Sua loi encoding tieng Viet o scanner sau khi noi batch backend (2026-04-13 11:03:46)
+
+### File lien quan
+
+- `frontend/src/hooks/useFaceRegistration.js`
+- `frontend/src/lib/faceApiService.js`
+- `WORKLOG_SINCE_CLONE.md`
+
+### Noi dung
+
+- Sua lai cac chuoi tieng Viet bi mojibake trong hook scanner va API client sau lan ghi file truoc do.
+- Cac nhan nhu `Nh?n th?ng`, `Quay tr?i`, `Nh?n l?n`, thong bao guidance va message upload da hien thi dung UTF-8 tro lai.
+- Verify lai bang `npm run build` va `npm test -- EmployeeFaceScannerPage.test.jsx`: deu pass.

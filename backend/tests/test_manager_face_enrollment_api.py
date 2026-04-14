@@ -6,11 +6,11 @@ from werkzeug.datastructures import MultiDict
 
 try:
     from backend.app.extensions import db
-    from backend.app.models import Employee, FaceSample
+    from backend.app.models import Employee, FaceEmbedding, FaceSample
     from backend.tests.test_manager_api import _create_employee, _create_manager
 except ModuleNotFoundError:
     from app.extensions import db
-    from app.models import Employee, FaceSample
+    from app.models import Employee, FaceEmbedding, FaceSample
     from tests.test_manager_api import _create_employee, _create_manager
 
 
@@ -32,6 +32,19 @@ def _make_enrollment_payload(prefix="face"):
             ("images", (BytesIO(f"{prefix}-5".encode()), "5.jpg")),
         ]
     )
+
+
+def _make_batch_enrollment_payload(frame_count=20):
+    poses = ["front", "left", "right", "up", "down"]
+    payload = MultiDict()
+    metadata_frames = []
+
+    for index in range(frame_count):
+        payload.add("frames", (BytesIO(f"frame-{index}".encode()), f"frame-{index}.jpg"))
+        metadata_frames.append({"index": index, "hint_pose": poses[index % len(poses)]})
+
+    payload.add("metadata", '{"frames": ' + str(metadata_frames).replace("'", '"') + '}')
+    return payload
 
 
 def test_face_samples_list_requires_authentication(client):
@@ -633,3 +646,69 @@ def test_face_deletion_removes_all_samples_and_files(app, client):
 def tmp_path_sample_path(app, employee_id, sample_index):
     faces_dir = Path(app.config["FACES_DIR"])
     return faces_dir / f"employee-{employee_id}" / f"sample-{sample_index}.jpg"
+
+
+
+def test_face_batch_enrollment_rejects_non_20_to_30_frame_batches(app, client):
+    manager = _create_manager(app)
+    employee = _create_employee(app, employee_code="EMP-315", full_name="Invalid Batch")
+    _login_manager(client, manager)
+
+    response = client.post(
+        f"/api/manager/employees/{employee['id']}/face-enrollment/batch",
+        data=_make_batch_enrollment_payload(frame_count=19),
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["status"] == "invalid_request"
+    assert payload["frame_count"] == 19
+
+
+def test_face_batch_enrollment_persists_preview_samples_and_embeddings(app, client):
+    manager = _create_manager(app)
+    employee = _create_employee(app, employee_code="EMP-316", full_name="Batch Enrollment")
+    _login_manager(client, manager)
+
+    refresh_calls = {"count": 0}
+
+    class FakeEmbeddingService:
+        def extract_embeddings(self, frame_bytes):
+            suffix = int(frame_bytes.decode().split("-")[-1])
+            return [[0.11 + (suffix * 0.01), 0.2 + (suffix % 3) * 0.01, 0.3]]
+
+    class FakeFaceIndexService:
+        def refresh(self):
+            refresh_calls["count"] += 1
+
+    app.extensions["embedding_service"] = FakeEmbeddingService()
+    app.extensions["face_index_service"] = FakeFaceIndexService()
+
+    response = client.post(
+        f"/api/manager/employees/{employee['id']}/face-enrollment/batch",
+        data=_make_batch_enrollment_payload(frame_count=20),
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 201
+    payload = response.get_json()
+    assert payload["status"] == "enrolled_from_batch"
+    assert payload["face_sample_count"] == 5
+    assert payload["valid_frame_count"] == 20
+    assert payload["selected_frame_count"] == 20
+    assert payload["saved_embedding_count"] == 11
+    assert payload["representative_embedding_count"] == 10
+    assert [sample["sample_index"] for sample in payload["face_samples"]] == [1, 2, 3, 4, 5]
+    assert [sample["pose_label"] for sample in payload["face_samples"]] == ["front", "left", "right", "up", "down"]
+    assert refresh_calls["count"] == 1
+
+    with app.app_context():
+        sample_rows = FaceSample.query.filter_by(employee_id=employee["id"]).order_by(FaceSample.sample_index.asc()).all()
+        embedding_rows = FaceEmbedding.query.filter_by(employee_id=employee["id"]).order_by(FaceEmbedding.id.asc()).all()
+        assert len(sample_rows) == 5
+        assert len(embedding_rows) == 11
+        assert embedding_rows[0].embedding_role == "mean"
+        assert sum(1 for row in embedding_rows if row.embedding_role == "representative") == 10
+        for row in sample_rows:
+            assert Path(row.image_path).exists()

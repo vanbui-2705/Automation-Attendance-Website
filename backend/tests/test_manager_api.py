@@ -6,11 +6,11 @@ from werkzeug.security import generate_password_hash
 try:
     from backend.app import create_app
     from backend.app.extensions import db
-    from backend.app.models import Employee, FaceSample, ManagerUser
+    from backend.app.models import Employee, FaceEmbedding, FaceSample, ManagerUser
 except ModuleNotFoundError:
     from app import create_app
     from app.extensions import db
-    from app.models import Employee, FaceSample, ManagerUser
+    from app.models import Employee, FaceEmbedding, FaceSample, ManagerUser
 
 
 def _create_manager(app, username="manager", password="secret123"):
@@ -390,6 +390,16 @@ def test_manager_delete_employee_soft_deletes_and_clears_faces(app, client):
         sample_path.parent.mkdir(parents=True, exist_ok=True)
         sample_path.write_bytes(b"sample-1")
         db.session.add(sample)
+        db.session.add(
+            FaceEmbedding(
+                employee_id=employee["id"],
+                embedding_role="mean",
+                pose_label="aggregate",
+                quality_score=None,
+                image_path=None,
+                embedding_json="[0.1, 0.2, 0.3]",
+            )
+        )
         db.session.commit()
 
     response = client.delete(f"/api/manager/employees/{employee['id']}")
@@ -407,4 +417,27 @@ def test_manager_delete_employee_soft_deletes_and_clears_faces(app, client):
         deleted_employee = db.session.get(Employee, employee["id"])
         assert deleted_employee.is_active is False
         assert FaceSample.query.filter_by(employee_id=employee["id"]).count() == 0
+        assert FaceEmbedding.query.filter_by(employee_id=employee["id"]).count() == 0
         assert sample_path.exists() is False
+
+def test_manager_dashboard_excludes_inactive_employees_from_summary(app, client):
+    manager = _create_manager(app)
+    active_employee = _create_employee(app, employee_code="EMP-401", full_name="Active Employee")
+    inactive_employee = _create_employee(app, employee_code="EMP-402", full_name="Inactive Employee")
+
+    login_response = client.post(
+        "/api/manager/login",
+        json={"username": manager["username"], "password": manager["password"]},
+    )
+    assert login_response.status_code == 200
+
+    delete_response = client.delete(f"/api/manager/employees/{inactive_employee['id']}")
+    assert delete_response.status_code == 200
+
+    response = client.get("/api/manager/dashboard")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["summary"]["total_employees"] == 1
+    assert payload["summary"]["absent_today"] == 1
+    assert [item["id"] for item in payload["employee_stats"]] == [active_employee["id"]]

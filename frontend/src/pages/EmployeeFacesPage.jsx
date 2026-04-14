@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { useManagerAuth } from "../context/ManagerAuthContext";
@@ -121,6 +121,20 @@ export default function EmployeeFacesPage() {
     }
   }
 
+  function handleBatchFilesChange(event) {
+    const selectedFiles = Array.from(event.target.files || []);
+    if (selectedFiles.length === 0) {
+      return;
+    }
+
+    setFiles((previousFiles) => {
+      const mergedFiles = [...previousFiles, ...selectedFiles];
+      return mergedFiles.slice(0, TOTAL_SLOTS);
+    });
+
+    event.target.value = "";
+  }
+
   return (
     <div className="page-shell">
       <div className="page-header">
@@ -129,9 +143,14 @@ export default function EmployeeFacesPage() {
           <h1>Quản lý bộ 5 ảnh khuôn mặt AI</h1>
           <p className="text-secondary">{employee ? `${employee.employee_code} · ${employee.full_name}` : "Đang tải thông tin nhân viên..."}</p>
         </div>
-        <Link className="btn btn-secondary" to="/manager/employees">
-          Quay lại nhân viên
-        </Link>
+        <div className="row-actions">
+          <Link className="btn btn-primary" to={`/manager/employees/${employeeId}/face-registration`}>
+            Mở scanner khuôn mặt
+          </Link>
+          <Link className="btn btn-secondary" to="/manager/employees">
+            Quay lại nhân viên
+          </Link>
+        </div>
       </div>
 
       {message ? <div className={`alert alert-${messageType}`}>{message}</div> : null}
@@ -204,7 +223,7 @@ export default function EmployeeFacesPage() {
           <form className="field-group" onSubmit={handleEnroll}>
             <div className="field">
               <label htmlFor="face-files">Ảnh khuôn mặt</label>
-              <input id="face-files" type="file" accept="image/*" multiple onChange={(event) => setFiles(Array.from(event.target.files || []))} />
+              <input id="face-files" type="file" accept="image/*" multiple onChange={handleBatchFilesChange} />
             </div>
             <div className="pill">
               {files.length} / {TOTAL_SLOTS} ảnh đã chọn
