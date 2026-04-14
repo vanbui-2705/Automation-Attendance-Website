@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { useManagerAuth } from "../context/ManagerAuthContext";
@@ -129,9 +129,14 @@ export default function EmployeeFacesPage() {
           <h1>Quản lý bộ 5 ảnh khuôn mặt AI</h1>
           <p className="text-secondary">{employee ? `${employee.employee_code} · ${employee.full_name}` : "Đang tải thông tin nhân viên..."}</p>
         </div>
-        <Link className="btn btn-secondary" to="/manager/employees">
-          Quay lại nhân viên
-        </Link>
+        <div className="row-actions">
+          <Link className="btn btn-primary" to={`/manager/employees/${employeeId}/face-registration`}>
+            Mở scanner khuôn mặt
+          </Link>
+          <Link className="btn btn-secondary" to="/manager/employees">
+            Quay lại nhân viên
+          </Link>
+        </div>
       </div>
 
       {message ? <div className={`alert alert-${messageType}`}>{message}</div> : null}

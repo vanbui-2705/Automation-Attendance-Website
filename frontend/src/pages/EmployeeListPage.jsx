@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { useManagerAuth } from "../context/ManagerAuthContext";
@@ -315,25 +315,28 @@ export default function EmployeeListPage() {
                           <span className={`badge badge-${status.tone}`}>{status.label}</span>
                         </td>
                         <td>
-                          <div className="row-actions">
-                            <Link className="btn btn-ghost btn-sm" to={`/manager/employees/${employee.id}/faces`}>
-                              Khuôn mặt
+                          <div className="row-actions employee-row-actions">
+                            <Link className="btn btn-ghost btn-sm employee-row-actions__main" to={`/manager/employees/${employee.id}/faces`}>
+                              Face Manager
+                            </Link>
+                            <Link className="btn btn-secondary btn-sm employee-row-actions__main" to={`/manager/employees/${employee.id}/face-registration`}>
+                              Face Scanner
                             </Link>
                             {editingId === employee.id ? (
                               <>
-                                <button type="button" className="btn btn-primary btn-sm" onClick={() => handleUpdate(employee.id)} disabled={actionLoading}>
+                                <button type="button" className="btn btn-primary btn-sm employee-row-actions__utility" onClick={() => handleUpdate(employee.id)} disabled={actionLoading}>
                                   Lưu
                                 </button>
-                                <button type="button" className="btn btn-ghost btn-sm" onClick={cancelEdit} disabled={actionLoading}>
+                                <button type="button" className="btn btn-ghost btn-sm employee-row-actions__utility" onClick={cancelEdit} disabled={actionLoading}>
                                   Hủy
                                 </button>
                               </>
                             ) : (
                               <>
-                                <button type="button" className="btn btn-ghost btn-sm" onClick={() => startEdit(employee)} disabled={actionLoading}>
+                                <button type="button" className="btn btn-ghost btn-sm employee-row-actions__utility" onClick={() => startEdit(employee)} disabled={actionLoading}>
                                   Sửa
                                 </button>
-                                <button type="button" className="btn btn-danger btn-sm" onClick={() => handleDelete(employee.id)} disabled={actionLoading}>
+                                <button type="button" className="btn btn-danger btn-sm employee-row-actions__utility" onClick={() => handleDelete(employee.id)} disabled={actionLoading}>
                                   Xóa
                                 </button>
                               </>

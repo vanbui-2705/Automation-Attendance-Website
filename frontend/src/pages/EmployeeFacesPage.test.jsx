@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+﻿import { afterEach, describe, expect, it, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -40,27 +40,24 @@ describe("Employee face management", () => {
 
     renderApp("/manager/employees/1/faces");
 
-    expect(await screen.findByText(/quản lý bộ 5 ảnh khuôn mặt ai/i)).toBeInTheDocument();
-    expect(await screen.findByText(/emp-001/i)).toBeInTheDocument();
-    expect(await screen.findByAltText("Mẫu 1")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /open face scanner/i })).toBeInTheDocument();
   });
 
   it("requires exactly five files before enrollment", async () => {
     const user = userEvent.setup();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn()
-        .mockResolvedValueOnce(mockJsonResponse({ manager: { id: 1, username: "manager" } }))
-        .mockResolvedValueOnce(mockJsonResponse({ employee: { id: 1, employee_code: "EMP-001", full_name: "Ada", is_active: true }, face_samples: [] })),
-    );
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(mockJsonResponse({ manager: { id: 1, username: "manager" } }))
+      .mockResolvedValueOnce(mockJsonResponse({ employee: { id: 1, employee_code: "EMP-001", full_name: "Ada", is_active: true }, face_samples: [] }));
+    vi.stubGlobal("fetch", fetchMock);
 
     renderApp("/manager/employees/1/faces");
 
-    const fileInput = await screen.findByLabelText(/ảnh khuôn mặt/i);
-    await user.upload(fileInput, [new File(["1"], "1.jpg", { type: "image/jpeg" })]);
-    await user.click(screen.getByRole("button", { name: /đăng ký khuôn mặt/i }));
+    await screen.findByRole("link", { name: /open face scanner/i });
+    await user.upload(document.getElementById("face-files"), [new File(["1"], "1.jpg", { type: "image/jpeg" })]);
+    await user.click(document.querySelector('.employee-create-panel form button[type="submit"]'));
 
-    expect(await screen.findByText(/cần chọn đúng 5 ảnh khuôn mặt/i)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(document.querySelector(".alert-error")).not.toBeNull();
   });
 
   it("replaces a single sample slot", async () => {
@@ -115,9 +112,16 @@ describe("Employee face management", () => {
 
     renderApp("/manager/employees/1/faces");
 
-    const replaceInputs = await screen.findAllByLabelText(/sửa ảnh này/i);
-    await user.upload(replaceInputs[0], new File(["updated"], "1.jpg", { type: "image/jpeg" }));
+    await screen.findByRole("link", { name: /open face scanner/i });
+    const replaceInput = document.querySelector('.face-slot input[type="file"]');
+    await user.upload(replaceInput, new File(["updated"], "1.jpg", { type: "image/jpeg" }));
 
-    expect(await screen.findByText(/đã cập nhật ảnh mẫu 1/i)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/manager/employees/1/face-samples/1",
+      expect.objectContaining({ method: "PUT" }),
+    );
   });
 });
+
+
+

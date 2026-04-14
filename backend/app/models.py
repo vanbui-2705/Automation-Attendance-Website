@@ -22,7 +22,7 @@ class Employee(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     employee_code = db.Column(db.String(64), unique=True, nullable=False, index=True)
     full_name = db.Column(db.String(255), nullable=False)
-    department = db.Column(db.String(255), nullable=False, default="Văn phòng")
+    department = db.Column(db.String(255), nullable=False, default="Van phong")
     position = db.Column(db.String(255), nullable=False, default="Nhan vien")
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
@@ -42,6 +42,19 @@ class FaceSample(db.Model):
     employee_id = db.Column(db.Integer, db.ForeignKey("employees.id"), nullable=False)
     sample_index = db.Column(db.Integer, nullable=False)
     image_path = db.Column(db.String(512), nullable=False)
+    embedding_json = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+
+
+class FaceEmbedding(db.Model):
+    __tablename__ = "face_embeddings"
+
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey("employees.id"), nullable=False, index=True)
+    embedding_role = db.Column(db.String(32), nullable=False, default="representative")
+    pose_label = db.Column(db.String(32), nullable=True)
+    quality_score = db.Column(db.Float, nullable=True)
+    image_path = db.Column(db.String(512), nullable=True)
     embedding_json = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
 
